@@ -200,7 +200,7 @@ function SettingsPage() {
         </Card>
 
 
-        <Card title="Persona override" subtitle="Replace the System of Josiah default. Leave blank to use the built-in.">
+        <Card title="Persona override" subtitle="Replace the DED default. Leave blank to use the built-in.">
           <Field label="System prompt">
             <textarea
               value={form.system_prompt_override}
@@ -209,7 +209,7 @@ function SettingsPage() {
               }
               rows={10}
               className="auth-input font-mono text-xs"
-              placeholder="Default: System of Josiah"
+              placeholder="Default: DED (Dead Entertainment Dataset)"
             />
           </Field>
         </Card>
