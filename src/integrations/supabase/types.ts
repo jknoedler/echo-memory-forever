@@ -14,13 +14,274 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      biometrics: {
+        Row: {
+          id: string
+          ingested_at: string
+          kind: string
+          recorded_at: string
+          user_id: string
+          value: Json
+        }
+        Insert: {
+          id?: string
+          ingested_at?: string
+          kind: string
+          recorded_at?: string
+          user_id: string
+          value: Json
+        }
+        Update: {
+          id?: string
+          ingested_at?: string
+          kind?: string
+          recorded_at?: string
+          user_id?: string
+          value?: Json
+        }
+        Relationships: []
+      }
+      memories: {
+        Row: {
+          content: string
+          created_at: string
+          embedding: string | null
+          id: string
+          metadata: Json
+          source: string
+          thread_id: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          source?: string
+          thread_id?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          embedding?: string | null
+          id?: string
+          metadata?: Json
+          source?: string
+          thread_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memories_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          parts: Json | null
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          parts?: Json | null
+          role: string
+          thread_id: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          parts?: Json | null
+          role?: string
+          thread_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string | null
+          dob: string | null
+          persona_brief: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string | null
+          dob?: string | null
+          persona_brief?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string | null
+          dob?: string | null
+          persona_brief?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      staged_tasks: {
+        Row: {
+          created_at: string
+          decided_at: string | null
+          description: string | null
+          due_at: string | null
+          id: string
+          payload: Json
+          status: string
+          thread_id: string | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          decided_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          payload?: Json
+          status?: string
+          thread_id?: string | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          decided_at?: string | null
+          description?: string | null
+          due_at?: string | null
+          id?: string
+          payload?: Json
+          status?: string
+          thread_id?: string | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staged_tasks_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      threads: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          biometrics_secret: string
+          created_at: string
+          custom_api_key: string | null
+          custom_base_url: string | null
+          custom_model_id: string | null
+          hotl_auto_execute: boolean
+          model: string
+          provider: string
+          system_prompt_override: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          biometrics_secret?: string
+          created_at?: string
+          custom_api_key?: string | null
+          custom_base_url?: string | null
+          custom_model_id?: string | null
+          hotl_auto_execute?: boolean
+          model?: string
+          provider?: string
+          system_prompt_override?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          biometrics_secret?: string
+          created_at?: string
+          custom_api_key?: string | null
+          custom_base_url?: string | null
+          custom_model_id?: string | null
+          hotl_auto_execute?: boolean
+          model?: string
+          provider?: string
+          system_prompt_override?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      match_memories: {
+        Args: { match_count?: number; query_embedding: string }
+        Returns: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json
+          similarity: number
+          source: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never
