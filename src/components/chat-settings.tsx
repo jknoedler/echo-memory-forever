@@ -5,7 +5,7 @@ import { Settings as SettingsIcon, Sun, Moon, Monitor, Check, ExternalLink } fro
 import { toast } from "sonner";
 import { useTheme, type ThemeMode } from "@/lib/theme";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
-import { listUserProviders, setActiveProvider } from "@/lib/providers.functions";
+import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings } from "@/lib/settings.functions";
 
 const ADV_KEY = "mement0_advanced";
@@ -110,9 +110,10 @@ export function ModelPicker() {
 
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
+  const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -130,18 +131,32 @@ export function ModelPicker() {
   }, [open]);
 
   const activeId = settingsQ.data?.active_provider_id ?? null;
+  const providerKind = settingsQ.data?.provider ?? "lovable";
+  const envOpenAiActive = !activeId && providerKind === "openai";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
     ? `${activeCat?.name ?? "Custom"} · ${settingsQ.data?.model || activeProvider?.default_model || "—"}`
-    : "Auto (recommended)";
+    : envOpenAiActive
+      ? `OpenAI · ${settingsQ.data?.model || "gpt-4o-mini"}`
+      : "Auto (recommended)";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
   );
 
   function pickAuto() {
-    activateM.mutate({ provider_id: null });
+    activateM.mutate({ provider_id: null, provider_kind: "lovable" });
+    setOpen(false);
+  }
+
+  function pickEnvOpenAi() {
+    const cat = findCatalog("openai");
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "openai",
+      model: cat?.models[0] ?? "gpt-4o-mini",
+    });
     setOpen(false);
   }
 
@@ -186,8 +201,31 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.openai && !connectedByCat.get("openai") && (
+            <button
+              type="button"
+              onClick={pickEnvOpenAi}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envOpenAiActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">OpenAI (project key)</span>
+                <span className="block text-[10px] truncate">
+                  gpt-4o-mini · uses OPENAI_API_KEY
+                </span>
+              </span>
+              {envOpenAiActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           <div className="my-1 h-px bg-border" />
           {CATALOG.map((c) => {
             const conn = connectedByCat.get(c.id);
