@@ -12,7 +12,14 @@
 //      messages table AND embed them into the memories table for future RAG.
 
 import { createFileRoute } from "@tanstack/react-router";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import {
+  convertToModelMessages,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
+  generateText,
+  streamText,
+  type UIMessage,
+} from "ai";
 import { createClient } from "@supabase/supabase-js";
 import { resolveProvider } from "@/lib/ai-provider.server";
 import { DED_PERSONA } from "@/lib/persona";
@@ -23,6 +30,7 @@ import {
   sweepRecalibrations,
   updateStyleFingerprint,
 } from "@/lib/personality.server";
+import { FALLBACK_PREAMBLE, FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal } from "@/lib/refusal";
 import type { Database } from "@/integrations/supabase/types";
 
 function isNewKey(v: string) {
