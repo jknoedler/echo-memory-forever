@@ -70,10 +70,11 @@ export const setActiveProvider = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       provider_id: z.string().uuid().nullable(),
-      provider_kind: z.enum(["lovable", "openai", "groq", "llama", "custom"]).optional(),
+      provider_kind: z.enum(["lovable", "openai", "groq", "llama", "venice", "custom"]).optional(),
       model: z.string().max(200).optional(),
     }).parse(d),
   )
+
   .handler(async ({ data, context }) => {
     const providerName =
       data.provider_id !== null
