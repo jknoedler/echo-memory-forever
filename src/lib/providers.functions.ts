@@ -74,14 +74,15 @@ export const setActiveProvider = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
-    const update: Record<string, unknown> = { active_provider_id: data.provider_id };
-    if (data.provider_id === null) {
-      // back to default gateway
-      update.provider = "lovable";
-    } else {
-      update.provider = "custom"; // resolver branches on active_provider_id first anyway
-      if (data.model) update.model = data.model;
-    }
+    const update: {
+      active_provider_id: string | null;
+      provider: string;
+      model?: string;
+    } = {
+      active_provider_id: data.provider_id,
+      provider: data.provider_id === null ? "lovable" : "custom",
+    };
+    if (data.provider_id !== null && data.model) update.model = data.model;
     const { error } = await context.supabase
       .from("user_settings")
       .update(update)
