@@ -55,8 +55,8 @@ function Landing() {
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
             v0 — lifelong AI memory, now boot-strapping
           </div>
-          <p className="mt-7 text-sm uppercase tracking-[0.3em] text-muted-foreground">Mement0</p>
-          <h1 className="mt-6 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95] ember-text">MORE</h1>
+          <p className="mt-7 font-display text-5xl md:text-7xl font-semibold tracking-tight leading-[0.95] ember-text">Mement0</p>
+          <h1 className="mt-2 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95] ember-text">MORE</h1>
           <p className="mt-2 text-xl md:text-2xl text-muted-foreground tracking-widest">0&nbsp;loss</p>
 
           <p className="mx-auto mt-10 max-w-2xl text-lg text-muted-foreground leading-relaxed">
@@ -138,12 +138,11 @@ function Landing() {
         <div className="mx-auto max-w-4xl px-5 py-24 text-center">
           <p className="text-xs uppercase tracking-widest text-primary">Legacy</p>
           <h2 className="mt-3 text-4xl md:text-5xl font-display font-semibold tracking-tight">
-            Paper burns. Mement0 doesn't.
+            Mement0's memory doesn't.
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
-            When the time comes, your archive becomes inheritance. Your children's children
-            can ask: <span className="text-foreground italic">"what would you have said?"</span> —
-            and a voice answers, made of decades of you.
+            Make sure your memories live on endlessly. Be there for your loved ones long after you pass.
+            Your archive becomes inheritance — a voice that answers, made of decades of you.
           </p>
           <Link
             to="/auth"
@@ -151,6 +150,55 @@ function Landing() {
           >
             Begin the archive <ArrowRight className="h-4 w-4" />
           </Link>
+        </div>
+      </section>
+
+      {/* GROWS WITH YOU */}
+      <section id="grows" className="mx-auto max-w-4xl px-5 py-24 text-center">
+        <p className="text-xs uppercase tracking-widest text-primary">Evolution</p>
+        <h2 className="mt-3 text-4xl md:text-5xl font-display font-semibold tracking-tight">
+          An AI that grows with you.
+        </h2>
+        <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+          Start young. Let your kids learn to read from their agentic AI. Let Mement0 be their first
+          and best teacher. The model grows with the child, learns from them, evolves with them,
+          matures with them — and your child has a lifelong companion who knows them better than anyone
+          and is always there, through thick and thin.
+        </p>
+        <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+          Its personality is tailored to the individual user, so no two models are the same once they have
+          learned your preferences over time.
+        </p>
+      </section>
+
+      {/* BUILT FOR YOU */}
+      <section id="built" className="border-t border-border bg-card/30">
+        <div className="mx-auto max-w-4xl px-5 py-24 text-center">
+          <p className="text-xs uppercase tracking-widest text-primary">Principles</p>
+          <h2 className="mt-3 text-4xl md:text-5xl font-display font-semibold tracking-tight">
+            Your archive. Your model. No forgetting.
+          </h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+            Unlike other AI, we do not forget. All of your memories, all of your work, forever.
+            Remember that project you did last fall for two days before Thanksgiving? Mement0 remembers MORE.
+            It never forgets. It builds an archive of <em>you</em> in a way never possible before now.
+          </p>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+            From personal assistant, to personal trainer, to friend, to confidant, to companion —
+            it is there, and it will not need you to explain the context repeatedly like current models.
+          </p>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+            Mement0 is truly model-agnostic. It uses all major models and can be the controller for
+            smaller self-hosted models like Llama. No judgment, no hallucination — it is always thinking
+            about you, and only you.
+          </p>
+          <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground leading-relaxed">
+            Most LLMs get bogged down on training. Their goal is not to help or learn from you — it is
+            to train itself for the benefit of others. We do not allow the model to train under our control,
+            which alleviates the hallucination and context overwhelm that normally cause AI error. That is
+            why we can offer endless memory while the large models cannot: they are worried about the model
+            and its future. We are focused on you and your archive, first and foremost.
+          </p>
         </div>
       </section>
 
