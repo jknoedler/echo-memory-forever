@@ -125,7 +125,7 @@ function SettingsPage() {
               }}
               className="auth-input"
             >
-              <option value="lovable">Included gateway — no key required</option>
+              <option value="lovable">Claude (default) — no key required</option>
               <option value="openai">OpenAI Direct — uses project OPENAI_API_KEY</option>
               <option value="custom">Bring your own — OpenAI-compatible endpoint</option>
             </select>
