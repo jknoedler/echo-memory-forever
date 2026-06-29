@@ -281,6 +281,7 @@ export const Route = createFileRoute("/api/chat")({
             openaiApiKey: process.env.OPENAI_API_KEY,
             groqApiKey: process.env.GROQ_API_KEY,
             llamaApiKey: process.env.LLAMA_API_KEY,
+            veniceApiKey: process.env.VENICE_API_KEY,
             activeProvider,
           });
           primaryModel = resolved.model;
@@ -290,6 +291,7 @@ export const Route = createFileRoute("/api/chat")({
             { status: 500 },
           );
         }
+
 
         // Resolve fallback provider (best-effort — never blocks primary).
         let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
