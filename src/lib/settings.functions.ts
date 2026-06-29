@@ -29,7 +29,7 @@ export const getMySettings = createServerFn({ method: "GET" })
   });
 
 const SettingsUpdate = z.object({
-  provider: z.enum(["lovable", "custom"]).optional(),
+  provider: z.enum(["lovable", "openai", "custom"]).optional(),
   model: z.string().max(200).optional(),
   custom_base_url: z.string().url().nullable().optional(),
   custom_api_key: z.string().max(500).nullable().optional(),

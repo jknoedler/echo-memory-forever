@@ -22,8 +22,21 @@ export type ResolvedProvider = {
 
 export function resolveProvider(
   cfg: UserAiConfig,
-  opts: { lovableApiKey?: string; initialRunId?: string } = {},
+  opts: { lovableApiKey?: string; openaiApiKey?: string; initialRunId?: string } = {},
 ): ResolvedProvider {
+  if (cfg.provider === "openai") {
+    if (!opts.openaiApiKey) {
+      throw new Error("OpenAI provider selected but OPENAI_API_KEY is not configured.");
+    }
+    const modelId = cfg.model || "gpt-4o-mini";
+    const provider = createOpenAICompatible({
+      name: "openai",
+      baseURL: "https://api.openai.com/v1",
+      headers: { Authorization: `Bearer ${opts.openaiApiKey}` },
+    });
+    return { model: provider(modelId), providerName: "openai", modelId };
+  }
+
   if (cfg.provider === "custom") {
     const baseURL = cfg.custom_base_url?.trim();
     const apiKey = cfg.custom_api_key?.trim() || "not-required";
