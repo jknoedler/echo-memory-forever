@@ -173,9 +173,10 @@ export async function captureDirective(
 
   const highEmotion = emotion >= HIGH_EMOTION_THRESHOLD;
   const status = highEmotion ? "under_review" : "active";
-  const recalibrate_after = highEmotion
-    ? new Date(Date.now() + RECAL_WINDOW_MS).toISOString()
-    : null;
+  // Every new rule gets a 24h check-in, regardless of emotion.
+  // Lets the user reverse course on rules they regret without remembering
+  // the exact phrasing to undo.
+  const recalibrate_after = new Date(Date.now() + RECAL_WINDOW_MS).toISOString();
 
   const { data, error } = await supabase
     .from("personality_rules")
@@ -189,8 +190,8 @@ export async function captureDirective(
       recalibrate_after,
       source_message: text.slice(0, 1000),
       reason: highEmotion
-        ? "Captured during a high-emotion moment. Honor it now, re-confirm later."
-        : "Captured from explicit user directive.",
+        ? "Captured during a high-emotion moment. Honor it now, re-confirm in 24h."
+        : "Captured from explicit user directive. Re-confirm in 24h.",
     })
     .select("id, status, directive")
     .single();
@@ -208,11 +209,12 @@ export async function sweepRecalibrations(
 ): Promise<void> {
   const { data: ripe } = await supabase
     .from("personality_rules")
-    .select("id, directive, polarity")
+    .select("id, directive, polarity, status, emotion_score")
     .eq("user_id", userId)
-    .eq("status", "under_review")
+    .in("status", ["active", "under_review"])
+    .not("recalibrate_after", "is", null)
     .lt("recalibrate_after", new Date().toISOString())
-    .limit(5);
+    .limit(10);
   if (!ripe || ripe.length === 0) return;
 
   for (const r of ripe) {
@@ -223,15 +225,28 @@ export async function sweepRecalibrations(
       .eq("status", "pending")
       .ilike("title", `Recalibrate personality rule%${r.id}%`)
       .maybeSingle();
-    if (existing) continue;
 
-    await supabase.from("staged_tasks").insert({
-      user_id: userId,
-      title: `Recalibrate personality rule [${r.id}]`,
-      summary: `Earlier you told me ${r.polarity === "dont" ? "to stop" : "to start"}: "${r.directive}". You were heated when you said it. Want me to keep this as a permanent rule, or drop it?`,
-      kind: "personality_recalibration",
-      payload: { rule_id: r.id },
-    } as never);
+    if (!existing) {
+      const heated = (r.emotion_score ?? 0) >= HIGH_EMOTION_THRESHOLD;
+      const verb = r.polarity === "dont" ? "to stop" : "to start";
+      const heatedNote = heated
+        ? " You were heated when you said it."
+        : "";
+      await supabase.from("staged_tasks").insert({
+        user_id: userId,
+        title: `Recalibrate personality rule [${r.id}]`,
+        summary: `24h ago you told me ${verb}: "${r.directive}".${heatedNote} Want me to keep this as a permanent rule, or drop it?`,
+        kind: "personality_recalibration",
+        payload: { rule_id: r.id },
+      } as never);
+    }
+
+    // Clear the trigger so this rule doesn't re-fire forever. The user
+    // resolves it via the HOTL task (confirm/revoke).
+    await supabase
+      .from("personality_rules")
+      .update({ recalibrate_after: null })
+      .eq("id", r.id);
   }
 }
 
