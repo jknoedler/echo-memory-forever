@@ -274,7 +274,7 @@ export const Route = createFileRoute("/api/chat")({
         ].join("\n");
 
         // Resolve primary provider
-        let primaryModel;
+        let primaryModel: ReturnType<typeof resolveProvider>["model"];
         try {
           const resolved = resolveProvider(cfg, {
             lovableApiKey: process.env.LOVABLE_API_KEY,
