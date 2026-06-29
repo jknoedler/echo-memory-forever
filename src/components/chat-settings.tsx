@@ -246,6 +246,15 @@ export function ModelPicker() {
     setOpen(false);
   }
 
+  function pickEnvLlama() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "llama",
+      model: "Llama-3.3-70B-Instruct",
+    });
+    setOpen(false);
+  }
+
   function pickCatalog(catId: string) {
     const connected = connectedByCat.get(catId);
     if (connected) {
