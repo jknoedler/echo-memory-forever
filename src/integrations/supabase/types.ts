@@ -199,6 +199,8 @@ export type Database = {
       }
       threads: {
         Row: {
+          continuity_note: string | null
+          continuity_status: string
           created_at: string
           id: string
           last_message_at: string
@@ -207,6 +209,8 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          continuity_note?: string | null
+          continuity_status?: string
           created_at?: string
           id?: string
           last_message_at?: string
@@ -215,6 +219,8 @@ export type Database = {
           user_id: string
         }
         Update: {
+          continuity_note?: string | null
+          continuity_status?: string
           created_at?: string
           id?: string
           last_message_at?: string

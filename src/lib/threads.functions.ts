@@ -7,11 +7,35 @@ export const listThreads = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { data, error } = await context.supabase
       .from("threads")
-      .select("id, title, last_message_at, created_at")
+      .select("id, title, last_message_at, created_at, continuity_status, continuity_note")
       .order("last_message_at", { ascending: false })
       .limit(100);
     if (error) throw new Error(error.message);
     return data ?? [];
+  });
+
+export const setThreadContinuity = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        status: z.enum(["open", "resolved", "archived"]),
+        note: z.string().max(500).nullable().optional(),
+      })
+      .parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const patch: { continuity_status: string; continuity_note?: string | null } = {
+      continuity_status: data.status,
+    };
+    if (data.note !== undefined) patch.continuity_note = data.note;
+    const { error } = await context.supabase
+      .from("threads")
+      .update(patch)
+      .eq("id", data.id);
+    if (error) throw new Error(error.message);
+    return { ok: true };
   });
 
 export const createThread = createServerFn({ method: "POST" })

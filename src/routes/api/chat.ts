@@ -167,6 +167,21 @@ export const Route = createFileRoute("/api/chat")({
           .map((p) => `- ${p.title}${p.due_at ? ` (due ${p.due_at})` : ""}`)
           .join("\n");
 
+        // Continuity state for this thread
+        const { data: contThread } = await supabase
+          .from("threads")
+          .select("continuity_status, continuity_note, last_message_at")
+          .eq("id", threadId)
+          .maybeSingle();
+        const idleMs = contThread?.last_message_at
+          ? Date.now() - new Date(contThread.last_message_at).getTime()
+          : 0;
+        const isStaleOpen =
+          contThread?.continuity_status === "open" && idleMs > 12 * 60 * 60 * 1000;
+        const continuityBlock = isStaleOpen
+          ? `STALE_OPEN=true. This thread was abandoned ${Math.round(idleMs / 3_600_000)}h ago with unresolved material${contThread?.continuity_note ? ` (note: ${contThread.continuity_note})` : ""}. Lead the next assistant turn with a direct, blunt check-in that references the unresolved thread — no greeting, no preamble.`
+          : `STALE_OPEN=false. status=${contThread?.continuity_status ?? "open"}.`;
+
         const baseSystem = settings?.system_prompt_override?.trim() || SYSTEM_OF_JOSIAH;
         const system = [
           baseSystem,
@@ -179,6 +194,9 @@ export const Route = createFileRoute("/api/chat")({
           "",
           "### STAGED TASKS PENDING APPROVAL",
           pendingBlock || "(none)",
+          "",
+          "### CONTINUITY",
+          continuityBlock,
         ].join("\n");
 
         // Resolve provider
