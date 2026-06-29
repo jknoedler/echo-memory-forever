@@ -296,8 +296,31 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.llama && !connectedByCat.get("llama") && (
+            <button
+              type="button"
+              onClick={pickEnvLlama}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envLlamaActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Llama (project key)</span>
+                <span className="block text-[10px] truncate">
+                  Llama-3.3-70B-Instruct · uses LLAMA_API_KEY
+                </span>
+              </span>
+              {envLlamaActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           {envQ.data?.groq && !connectedByCat.get("groq") && (
             <button
               type="button"
