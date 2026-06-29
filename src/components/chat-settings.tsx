@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useTheme, type ThemeMode } from "@/lib/theme";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
-import { getMySettings } from "@/lib/settings.functions";
+import { getMySettings, updateMySettings } from "@/lib/settings.functions";
 
 const ADV_KEY = "mement0_advanced";
 
@@ -32,6 +32,19 @@ export function ChatSettings({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { mode, setMode } = useTheme();
+  const qc = useQueryClient();
+  const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
+  const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
+
+  const fallbackM = useMutation({
+    mutationFn: (id: string | null) =>
+      updateMySettings({ data: { fallback_provider_id: id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      toast.success("Fallback updated");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -96,6 +109,51 @@ export function ChatSettings({
               </span>
             </span>
           </label>
+
+          {advanced && (
+            <>
+              <div className="my-3 h-px bg-border" />
+              <div className="px-1">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Capability fallback
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
+                  If the primary model refuses or can't answer, auto-retry the
+                  same turn on this provider. Uses your library key.
+                </p>
+                <select
+                  className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                  value={settingsQ.data?.fallback_provider_id ?? ""}
+                  onChange={(e) =>
+                    fallbackM.mutate(e.target.value || null)
+                  }
+                >
+                  <option value="">Off</option>
+                  {(providersQ.data ?? []).map((p) => {
+                    const cat = findCatalog(p.catalog_id);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {cat?.name ?? p.label} ·{" "}
+                        {p.default_model || cat?.models[0] || "default"}
+                      </option>
+                    );
+                  })}
+                </select>
+                {(providersQ.data ?? []).length === 0 && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    Add a provider in{" "}
+                    <a
+                      href="/library"
+                      className="underline hover:text-foreground"
+                    >
+                      /library
+                    </a>{" "}
+                    first.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>

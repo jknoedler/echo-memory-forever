@@ -1,0 +1,1 @@
+ALTER TABLE public.user_settings ADD COLUMN IF NOT EXISTS fallback_provider_id UUID REFERENCES public.user_providers(id) ON DELETE SET NULL;
