@@ -107,19 +107,20 @@ function SettingsPage() {
           <h1 className="mt-1 text-3xl font-display tracking-tight">Settings</h1>
         </header>
 
-        <Card title="AI provider" subtitle="By default Mement0 routes through our included gateway — no API key needed from you. Want to use your own keys instead? Switch to Custom and point at any OpenAI-compatible endpoint (OpenRouter, OpenAI direct, Anthropic via proxy, Ollama, vLLM, self-hosted llama).">
-          <Field label="Provider" hint="Default = included. Custom = bring your own key / endpoint.">
+        <Card title="AI provider" subtitle="By default Mement0 routes through our included gateway — no API key needed from you. Switch to OpenAI Direct to use the project's OPENAI_API_KEY, or Custom to bring your own OpenAI-compatible endpoint (OpenRouter, Anthropic via proxy, Ollama, vLLM, self-hosted llama).">
+          <Field label="Provider" hint="Included = our gateway. OpenAI = direct via OPENAI_API_KEY. Custom = your own endpoint.">
             <select
               value={form.provider}
               onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
               className="auth-input"
             >
               <option value="lovable">Included gateway — no key required</option>
+              <option value="openai">OpenAI Direct — uses project OPENAI_API_KEY</option>
               <option value="custom">Bring your own — OpenAI-compatible endpoint</option>
             </select>
           </Field>
 
-          {form.provider === "lovable" ? (
+          {form.provider === "lovable" && (
             <Field label="Model">
               <select
                 value={form.model}
@@ -133,7 +134,25 @@ function SettingsPage() {
                 ))}
               </select>
             </Field>
-          ) : (
+          )}
+
+          {form.provider === "openai" && (
+            <Field label="Model" hint="Calls api.openai.com directly with the OPENAI_API_KEY stored on the project.">
+              <select
+                value={form.model}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                className="auth-input"
+              >
+                {OPENAI_DIRECT_MODELS.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          )}
+
+          {form.provider === "custom" && (
             <div className="space-y-4">
               <Field
                 label="Base URL"
@@ -168,6 +187,7 @@ function SettingsPage() {
             </div>
           )}
         </Card>
+
 
         <Card title="Persona override" subtitle="Replace the System of Josiah default. Leave blank to use the built-in.">
           <Field label="System prompt">
