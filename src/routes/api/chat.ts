@@ -323,7 +323,19 @@ export const Route = createFileRoute("/api/chat")({
               .from("threads")
               .update({ last_message_at: new Date().toISOString() })
               .eq("id", threadId);
+
+            // Regenerate multi-topic title (best-effort, non-blocking).
+            try {
+              const { summarizeThreadTitle } = await import("@/lib/thread-title.server");
+              const title = await summarizeThreadTitle(supabase, threadId);
+              if (title) {
+                await supabase.from("threads").update({ title }).eq("id", threadId);
+              }
+            } catch {
+              /* title summary is best-effort */
+            }
           },
+
         });
 
         return result.toUIMessageStreamResponse({ originalMessages: messages });
