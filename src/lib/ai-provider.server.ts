@@ -39,10 +39,12 @@ export function resolveProvider(
     openaiApiKey?: string;
     groqApiKey?: string;
     llamaApiKey?: string;
+    veniceApiKey?: string;
     initialRunId?: string;
     activeProvider?: ActiveProvider | null;
   } = {},
 ): ResolvedProvider {
+
   // 1. Saved provider from the user's library.
   if (opts.activeProvider) {
     const ap = opts.activeProvider;
