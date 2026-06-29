@@ -230,8 +230,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_providers: {
+        Row: {
+          api_key: string | null
+          base_url: string | null
+          catalog_id: string
+          created_at: string
+          default_model: string | null
+          id: string
+          label: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_key?: string | null
+          base_url?: string | null
+          catalog_id: string
+          created_at?: string
+          default_model?: string | null
+          id?: string
+          label: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_key?: string | null
+          base_url?: string | null
+          catalog_id?: string
+          created_at?: string
+          default_model?: string | null
+          id?: string
+          label?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
+          active_provider_id: string | null
           biometrics_secret: string
           created_at: string
           custom_api_key: string | null
@@ -245,6 +282,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          active_provider_id?: string | null
           biometrics_secret?: string
           created_at?: string
           custom_api_key?: string | null
@@ -258,6 +296,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          active_provider_id?: string | null
           biometrics_secret?: string
           created_at?: string
           custom_api_key?: string | null
@@ -270,7 +309,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "user_settings_active_provider_id_fkey"
+            columns: ["active_provider_id"]
+            isOneToOne: false
+            referencedRelation: "user_providers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
