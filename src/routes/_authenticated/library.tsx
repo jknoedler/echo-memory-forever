@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy, ExternalLink, Plus, Trash2, Zap } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
 import { CATALOG, findCatalog, type CatalogEntry } from "@/lib/provider-catalog";
 import {
   addUserProvider,
@@ -12,17 +13,34 @@ import {
 } from "@/lib/providers.functions";
 import { getMySettings } from "@/lib/settings.functions";
 
+const LibrarySearch = z.object({ focus: z.string().optional() });
+
 export const Route = createFileRoute("/_authenticated/library")({
+  validateSearch: (s) => LibrarySearch.parse(s),
   component: LibraryPage,
 });
 
 function LibraryPage() {
   const qc = useQueryClient();
+  const { focus } = Route.useSearch();
+  const cardRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const [pulse, setPulse] = useState<string | null>(null);
+
   const providersQ = useQuery({
     queryKey: ["user_providers"],
     queryFn: () => listUserProviders(),
   });
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
+
+  useEffect(() => {
+    if (!focus) return;
+    const node = cardRefs.current.get(focus);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPulse(focus);
+    const t = setTimeout(() => setPulse(null), 2400);
+    return () => clearTimeout(t);
+  }, [focus, providersQ.isLoading]);
 
   const addedByCatalog = useMemo(() => {
     const m = new Map<string, { id: string; default_model: string | null; has_key: boolean }>();
@@ -103,6 +121,8 @@ function LibraryPage() {
             {hosted.map((c) => (
               <ProviderCard
                 key={c.id}
+                cardRef={(el) => cardRefs.current.set(c.id, el)}
+                highlighted={pulse === c.id}
                 entry={c}
                 saved={addedByCatalog.get(c.id) ?? null}
                 isActive={(addedByCatalog.get(c.id)?.id ?? null) === activeId}
@@ -127,6 +147,8 @@ function LibraryPage() {
             {local.map((c) => (
               <ProviderCard
                 key={c.id}
+                cardRef={(el) => cardRefs.current.set(c.id, el)}
+                highlighted={pulse === c.id}
                 entry={c}
                 saved={addedByCatalog.get(c.id) ?? null}
                 isActive={(addedByCatalog.get(c.id)?.id ?? null) === activeId}
@@ -151,6 +173,8 @@ function ProviderCard({
   onRemove,
   onActivate,
   onSaved,
+  cardRef,
+  highlighted,
 }: {
   entry: CatalogEntry;
   saved: { id: string; default_model: string | null; has_key: boolean } | null;
@@ -158,11 +182,18 @@ function ProviderCard({
   onRemove: (id: string) => void;
   onActivate: (id: string, model?: string) => void;
   onSaved: () => void;
+  cardRef?: (el: HTMLDivElement | null) => void;
+  highlighted?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(entry.baseUrl);
   const [model, setModel] = useState(saved?.default_model || entry.models[0] || "");
+
+  // Auto-open the add form when navigated to with focus and not yet saved.
+  useEffect(() => {
+    if (highlighted && !saved) setOpen(true);
+  }, [highlighted, saved]);
 
   const addM = useMutation({
     mutationFn: () =>
@@ -186,9 +217,10 @@ function ProviderCard({
 
   return (
     <div
-      className={`rounded-xl border bg-card p-4 space-y-3 transition-colors ${
+      ref={cardRef}
+      className={`rounded-xl border bg-card p-4 space-y-3 transition-all ${
         isActive ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
-      }`}
+      } ${highlighted ? "ring-2 ring-primary shadow-[0_0_40px_-8px_oklch(0.78_0.14_68_/_0.6)]" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
