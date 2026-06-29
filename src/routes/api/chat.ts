@@ -465,7 +465,7 @@ export const Route = createFileRoute("/api/chat")({
             let fbText = "";
             try {
               const fb = streamText({
-                model: fallbackModel,
+                model: fallbackModel!,
                 system: system + FALLBACK_SYSTEM_SUFFIX,
                 messages: convertedMessages,
                 onFinish: (e) => {
