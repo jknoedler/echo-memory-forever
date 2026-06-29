@@ -109,7 +109,7 @@ function AuthPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="auth-input"
-                  placeholder="Josiah"
+                  placeholder="Your name"
                 />
               </Field>
             )}
