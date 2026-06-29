@@ -90,6 +90,7 @@ function Landing() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-5">
+        <Mement0Hero className="mb-10 h-56 w-auto md:h-72" />
         <form onSubmit={submit} className="w-full max-w-2xl">
           <div className="flex items-end gap-2 rounded-2xl border border-border bg-card/60 p-2 focus-within:border-primary/60 transition-colors ember-glow">
             <textarea
@@ -120,11 +121,11 @@ function Landing() {
               )}
             </button>
           </div>
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            {authed === false
-              ? "Sign in once. Your archive remembers everything after that."
-              : "MORE · 0 loss · the 0 is for L's"}
-          </p>
+          {authed === false && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Sign in once. Your archive remembers everything after that.
+            </p>
+          )}
         </form>
       </main>
 
