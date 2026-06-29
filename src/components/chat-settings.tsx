@@ -36,9 +36,13 @@ export function ChatSettings({
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
 
+  const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
+
   const fallbackM = useMutation({
-    mutationFn: (id: string | null) =>
-      updateMySettings({ data: { fallback_provider_id: id } }),
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | null }) =>
+      updateMySettings({
+        data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
       toast.success("Fallback updated");
