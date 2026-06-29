@@ -179,7 +179,7 @@ function About() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-8 flex items-center justify-between text-xs text-muted-foreground">
-          <Mement0Mark />
+          <Mement0Logo to="/" />
           <span>© Mement0 — the eternal archive.</span>
         </div>
       </footer>
