@@ -63,7 +63,7 @@ function SettingsPage() {
     mutationFn: () =>
       updateMySettings({
         data: {
-          provider: form.provider as "lovable" | "custom",
+          provider: form.provider as "lovable" | "openai" | "custom",
           model: form.model,
           custom_base_url: form.custom_base_url || null,
           custom_api_key: form.custom_api_key || null,
