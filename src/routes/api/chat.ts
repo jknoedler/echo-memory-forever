@@ -206,8 +206,11 @@ export const Route = createFileRoute("/api/chat")({
           : `STALE_OPEN=false. status=${contThread?.continuity_status ?? "open"}.`;
 
         const baseSystem = settings?.system_prompt_override?.trim() || DED_PERSONA;
+        const personalityBlock = await buildPersonalityBlock(supabase, userId);
         const system = [
           baseSystem,
+          "",
+          personalityBlock,
           "",
           "### RETRIEVED MEMORY CONTEXT",
           memoryBlock || "(no relevant memories retrieved)",
