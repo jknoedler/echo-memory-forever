@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedPersonalityRouteImport } from './routes/_authenticated/personality'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicBiometricsRouteImport } from './routes/api/public/biometrics'
@@ -55,6 +56,12 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedPersonalityRoute =
+  AuthenticatedPersonalityRouteImport.update({
+    id: '/personality',
+    path: '/personality',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -82,6 +89,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/personality': typeof AuthenticatedPersonalityRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/api/chat': typeof ApiChatRoute
@@ -94,6 +102,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
   '/library': typeof AuthenticatedLibraryRoute
+  '/personality': typeof AuthenticatedPersonalityRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/api/chat': typeof ApiChatRoute
@@ -108,6 +117,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
+  '/_authenticated/personality': typeof AuthenticatedPersonalityRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/api/chat': typeof ApiChatRoute
@@ -122,6 +132,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/app'
     | '/library'
+    | '/personality'
     | '/settings'
     | '/tasks'
     | '/api/chat'
@@ -134,6 +145,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/app'
     | '/library'
+    | '/personality'
     | '/settings'
     | '/tasks'
     | '/api/chat'
@@ -147,6 +159,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/_authenticated/app'
     | '/_authenticated/library'
+    | '/_authenticated/personality'
     | '/_authenticated/settings'
     | '/_authenticated/tasks'
     | '/api/chat'
@@ -214,6 +227,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/personality': {
+      id: '/_authenticated/personality'
+      path: '/personality'
+      fullPath: '/personality'
+      preLoaderRoute: typeof AuthenticatedPersonalityRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/library': {
       id: '/_authenticated/library'
       path: '/library'
@@ -248,6 +268,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
+  AuthenticatedPersonalityRoute: typeof AuthenticatedPersonalityRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedTasksRoute: typeof AuthenticatedTasksRoute
   AuthenticatedCThreadIdRoute: typeof AuthenticatedCThreadIdRoute
@@ -256,6 +277,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
+  AuthenticatedPersonalityRoute: AuthenticatedPersonalityRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedTasksRoute: AuthenticatedTasksRoute,
   AuthenticatedCThreadIdRoute: AuthenticatedCThreadIdRoute,
