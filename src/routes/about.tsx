@@ -92,7 +92,7 @@ function About() {
               Model-agnostic by design.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Mement0 is not loyal to any model. Default through the Lovable AI gateway. Bring your
+              Mement0 is not loyal to any model. Runs on Claude by default. Bring your
               own OpenAI, Anthropic, OpenRouter key. Or point it at a self-hosted llama running on
               your own machine. The brain swaps. The memory stays.
             </p>
