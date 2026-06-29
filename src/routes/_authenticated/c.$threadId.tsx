@@ -102,9 +102,16 @@ function ChatWindow({
     }
   }, [sendMessage]);
 
+  // Only scroll when a new message is appended (e.g., user sends), not on
+  // every streaming token. This lets the user read from the top while the
+  // assistant types without the view chasing the bottom.
+  const lastCountRef = useRef(0);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, status]);
+    if (messages.length > lastCountRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+      lastCountRef.current = messages.length;
+    }
+  }, [messages]);
 
   const isBusy = status === "submitted" || status === "streaming";
 
