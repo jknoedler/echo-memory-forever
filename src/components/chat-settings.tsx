@@ -5,7 +5,7 @@ import { Settings as SettingsIcon, Sun, Moon, Monitor, Check, ExternalLink } fro
 import { toast } from "sonner";
 import { useTheme, type ThemeMode } from "@/lib/theme";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
-import { listUserProviders, setActiveProvider } from "@/lib/providers.functions";
+import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings } from "@/lib/settings.functions";
 
 const ADV_KEY = "mement0_advanced";
