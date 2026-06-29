@@ -266,6 +266,7 @@ export const Route = createFileRoute("/api/chat")({
           const resolved = resolveProvider(cfg, {
             lovableApiKey: process.env.LOVABLE_API_KEY,
             openaiApiKey: process.env.OPENAI_API_KEY,
+            groqApiKey: process.env.GROQ_API_KEY,
             activeProvider,
           });
           primaryModel = resolved.model;
@@ -278,17 +279,36 @@ export const Route = createFileRoute("/api/chat")({
 
         // Resolve fallback provider (best-effort — never blocks primary).
         let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
-        if (fallbackProvider) {
+        let fallbackLabel: string | null = null;
+        if (fallbackEnvKind) {
+          try {
+            const resolvedFb = resolveProvider(
+              { ...cfg, provider: fallbackEnvKind, model: fallbackEnvKind === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o-mini" },
+              {
+                lovableApiKey: process.env.LOVABLE_API_KEY,
+                openaiApiKey: process.env.OPENAI_API_KEY,
+                groqApiKey: process.env.GROQ_API_KEY,
+                activeProvider: null,
+              },
+            );
+            fallbackModel = resolvedFb.model;
+            fallbackLabel = fallbackEnvKind;
+          } catch {
+            fallbackModel = null;
+          }
+        } else if (fallbackProvider) {
           try {
             const resolvedFb = resolveProvider(
               { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
               {
                 lovableApiKey: process.env.LOVABLE_API_KEY,
                 openaiApiKey: process.env.OPENAI_API_KEY,
+                groqApiKey: process.env.GROQ_API_KEY,
                 activeProvider: fallbackProvider,
               },
             );
             fallbackModel = resolvedFb.model;
+            fallbackLabel = fallbackProvider.catalog_id;
           } catch {
             fallbackModel = null;
           }
