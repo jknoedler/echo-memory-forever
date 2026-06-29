@@ -274,7 +274,7 @@ export const Route = createFileRoute("/api/chat")({
         ].join("\n");
 
         // Resolve primary provider
-        let primaryModel;
+        let primaryModel: ReturnType<typeof resolveProvider>["model"];
         try {
           const resolved = resolveProvider(cfg, {
             lovableApiKey: process.env.LOVABLE_API_KEY,
@@ -427,9 +427,11 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         // Build the streamed response. Primary streams normally. If it ends
-        // up looking like a refusal AND the user has a fallback provider
-        // configured, we open a second assistant message and stream the
-        // fallback response into it — same shape as OpenRouter's auto-router.
+        // up looking like a refusal OR errors out (rate limit, upstream 5xx)
+        // AND the user has a fallback configured, we silently swallow the
+        // primary failure and stream the fallback as the visible reply —
+        // same shape as OpenRouter's auto-router. The user never sees a red
+        // "an error occurred" bubble.
         //
         // Pre-emptive route: if the user's prompt obviously sits in a band
         // corporate models always refuse AND a fallback is configured, skip
@@ -438,33 +440,89 @@ export const Route = createFileRoute("/api/chat")({
 
         const uiStream = createUIMessageStream({
           execute: async ({ writer }) => {
-            let primaryText = "";
-            if (!preempt) {
-              const primary = streamText({
-                model: primaryModel,
-                system,
-                messages: convertedMessages,
-                onFinish: (e) => {
-                  primaryText = e.text ?? "";
-                },
-              });
-              writer.merge(primary.toUIMessageStream({ sendStart: true, sendFinish: true }));
-              // Wait until the primary stream is fully done before deciding
-              // whether to fire the fallback.
+            // Run one model and stream its text into the UI as a single
+            // assistant message. Returns the captured text + whether the
+            // model errored. We only emit the message envelope once the
+            // first delta arrives — so a model that fails before producing
+            // anything leaves zero visible trace.
+            async function runModel(
+              model: typeof primaryModel,
+              sys: string,
+            ): Promise<{ text: string; failed: boolean }> {
+              const messageId = crypto.randomUUID();
+              const partId = crypto.randomUUID();
+              let started = false;
+              let text = "";
               try {
-                await primary.consumeStream();
-              } catch {
-                /* primary stream errors surface to the client via the stream itself */
+                const run = streamText({
+                  model,
+                  system: sys,
+                  messages: convertedMessages,
+                });
+                for await (const delta of run.textStream) {
+                  if (!started) {
+                    writer.write({ type: "start", messageId });
+                    writer.write({ type: "start-step" });
+                    writer.write({ type: "text-start", id: partId });
+                    started = true;
+                  }
+                  text += delta;
+                  writer.write({ type: "text-delta", id: partId, delta });
+                }
+                if (started) {
+                  writer.write({ type: "text-end", id: partId });
+                  writer.write({ type: "finish-step" });
+                  writer.write({ type: "finish" });
+                }
+                return { text, failed: false };
+              } catch (e) {
+                // Close the message cleanly if we started one; otherwise
+                // emit nothing so the client doesn't render an empty bubble.
+                if (started) {
+                  writer.write({ type: "text-end", id: partId });
+                  writer.write({ type: "finish-step" });
+                  writer.write({ type: "finish" });
+                }
+                console.error("[chat] model stream failed:", e);
+                return { text, failed: true };
               }
+            }
 
-              await persistAssistant(primaryText, { tier: "primary" });
+            let primaryText = "";
+            let primaryFailed = false;
+            if (!preempt) {
+              const r = await runModel(primaryModel, system);
+              primaryText = r.text;
+              primaryFailed = r.failed;
+              if (!primaryFailed && primaryText) {
+                await persistAssistant(primaryText, { tier: "primary" });
+              }
             }
 
             const needFallback =
-              !!fallbackModel && (preempt || looksLikeRefusal(primaryText));
+              !!fallbackModel &&
+              (preempt || primaryFailed || looksLikeRefusal(primaryText));
 
             if (!needFallback) {
-              // Regenerate multi-topic title (best-effort).
+              // No fallback path. If primary itself failed and we have no
+              // fallback, surface a single human-readable line instead of
+              // the AI SDK's red error rendering.
+              if (primaryFailed && !fallbackModel) {
+                const mid = crypto.randomUUID();
+                const pid = crypto.randomUUID();
+                writer.write({ type: "start", messageId: mid });
+                writer.write({ type: "start-step" });
+                writer.write({ type: "text-start", id: pid });
+                writer.write({
+                  type: "text-delta",
+                  id: pid,
+                  delta:
+                    "The primary model is overloaded or refused, and no fallback is configured. Open Settings → Advanced to wire one up (Venice / Groq / Llama), then try again.",
+                });
+                writer.write({ type: "text-end", id: pid });
+                writer.write({ type: "finish-step" });
+                writer.write({ type: "finish" });
+              }
               try {
                 const { summarizeThreadTitle } = await import(
                   "@/lib/thread-title.server"
@@ -479,39 +537,36 @@ export const Route = createFileRoute("/api/chat")({
               return;
             }
 
-            // Refusal path: stream the fallback as a second assistant message.
-            let fbText = "";
-            try {
-              const fb = streamText({
-                model: fallbackModel!,
-                system: system + FALLBACK_SYSTEM_SUFFIX,
-                messages: convertedMessages,
-                onFinish: (e) => {
-                  fbText = e.text ?? "";
-                },
-              });
-              writer.merge(fb.toUIMessageStream({ sendStart: true, sendFinish: true }));
-              try {
-                await fb.consumeStream();
-              } catch {
-                /* fallback stream errors surface through the stream */
-              }
-            } catch (err) {
-              const msg = `${FALLBACK_PREAMBLE}\n\n[fallback error: ${
-                err instanceof Error ? err.message : String(err)
-              }]`;
-              fbText = msg;
+            // Fallback path. Stream the fallback as its own assistant message.
+            const fb = await runModel(fallbackModel!, system + FALLBACK_SYSTEM_SUFFIX);
+            let fbText = fb.text;
+            if (fb.failed && !fbText) {
+              // Both primary and fallback failed — give the user one clean line.
+              const mid = crypto.randomUUID();
+              const pid = crypto.randomUUID();
+              writer.write({ type: "start", messageId: mid });
+              writer.write({ type: "start-step" });
+              writer.write({ type: "text-start", id: pid });
+              const delta =
+                "Both the primary model and the fallback are unavailable right now. Try again in a moment.";
+              writer.write({ type: "text-delta", id: pid, delta });
+              writer.write({ type: "text-end", id: pid });
+              writer.write({ type: "finish-step" });
+              writer.write({ type: "finish" });
+              fbText = delta;
             }
 
             // Ensure the persisted fallback text always carries the preamble,
             // even if the fallback model ignored the instruction to lead with it.
-            const persistedFb = fbText.startsWith(FALLBACK_PREAMBLE)
-              ? fbText
-              : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
-            await persistAssistant(persistedFb, {
-              tier: "fallback",
-              fallback_catalog: fallbackLabel,
-            });
+            if (fbText) {
+              const persistedFb = fbText.startsWith(FALLBACK_PREAMBLE)
+                ? fbText
+                : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
+              await persistAssistant(persistedFb, {
+                tier: "fallback",
+                fallback_catalog: fallbackLabel,
+              });
+            }
 
             try {
               const { summarizeThreadTitle } = await import(
@@ -526,6 +581,7 @@ export const Route = createFileRoute("/api/chat")({
             }
           },
         });
+
 
         return createUIMessageStreamResponse({ stream: uiStream });
       },
