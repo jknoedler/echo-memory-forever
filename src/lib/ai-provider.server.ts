@@ -38,6 +38,7 @@ export function resolveProvider(
     lovableApiKey?: string;
     openaiApiKey?: string;
     groqApiKey?: string;
+    llamaApiKey?: string;
     initialRunId?: string;
     activeProvider?: ActiveProvider | null;
   } = {},
@@ -86,6 +87,19 @@ export function resolveProvider(
       headers: { Authorization: `Bearer ${opts.groqApiKey}` },
     });
     return { model: provider(modelId), providerName: "groq", modelId };
+  }
+
+  if (cfg.provider === "llama") {
+    if (!opts.llamaApiKey) {
+      throw new Error("Llama provider selected but LLAMA_API_KEY is not configured.");
+    }
+    const modelId = cfg.model || "Llama-3.3-70B-Instruct";
+    const provider = createOpenAICompatible({
+      name: "llama",
+      baseURL: "https://api.llama.com/compat/v1",
+      headers: { Authorization: `Bearer ${opts.llamaApiKey}` },
+    });
+    return { model: provider(modelId), providerName: "llama", modelId };
   }
 
   if (cfg.provider === "custom") {
