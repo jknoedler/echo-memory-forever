@@ -1,9 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { SendHorizonal, Loader2, CheckCircle2, CircleDot } from "lucide-react";
+import {
+  SendHorizonal,
+  Loader2,
+  CheckCircle2,
+  CircleDot,
+  Mic,
+  MicOff,
+  Volume2,
+  VolumeX,
+} from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getThreadMessages } from "@/lib/threads.functions";
@@ -14,6 +23,7 @@ import {
   type Attachment,
 } from "@/components/chat-attachments";
 import { ChatSettings, ModelPicker, useAdvanced } from "@/components/chat-settings";
+import { startMicRecorder, type MicRecorder } from "@/lib/voice";
 
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
   component: ChatPage,
@@ -27,6 +37,17 @@ function dbToUI(m: DBMsg): UIMessage {
     : [{ type: "text" as const, text: m.content }];
   return { id: m.id, role: (m.role as UIMessage["role"]) ?? "user", parts };
 }
+
+function fileToDataUrl(f: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(f);
+  });
+}
+
+const VOICE_KEY = "mement0_voice_mode";
 
 function ChatPage() {
   const { threadId } = Route.useParams();
@@ -59,6 +80,8 @@ function ChatPage() {
   return <ChatWindow key={threadId} threadId={threadId} token={token} initialMessages={initial} />;
 }
 
+type AttachmentWithFile = Attachment & { file: File };
+
 function ChatWindow({
   threadId,
   token,
@@ -85,10 +108,28 @@ function ChatWindow({
   });
 
   const [input, setInput] = useState("");
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [attachments, setAttachments] = useState<AttachmentWithFile[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [advanced, setAdvanced] = useAdvanced();
+
+  // Voice mode (mic + TTS)
+  const [voiceMode, setVoiceMode] = useState<boolean>(false);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setVoiceMode(window.localStorage.getItem(VOICE_KEY) === "1");
+  }, []);
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(VOICE_KEY, voiceMode ? "1" : "0");
+    }
+  }, [voiceMode]);
+
+  const [recording, setRecording] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const recorderRef = useRef<MicRecorder | null>(null);
+  const audioElRef = useRef<HTMLAudioElement | null>(null);
+  const playedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -113,6 +154,58 @@ function ChatWindow({
     }
   }, [messages]);
 
+  // Autoplay TTS on each newly-completed assistant message (voice mode only)
+  useEffect(() => {
+    if (!voiceMode) return;
+    if (status !== "ready") return;
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "assistant") return;
+    if (playedRef.current.has(last.id)) return;
+    const text = last.parts
+      .map((p) => (p.type === "text" ? p.text : ""))
+      .filter(Boolean)
+      .join("")
+      .trim();
+    if (!text) return;
+    playedRef.current.add(last.id);
+    void speak(text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, status, voiceMode]);
+
+  async function speak(text: string) {
+    try {
+      // Stop any current playback
+      if (audioElRef.current) {
+        audioElRef.current.pause();
+        audioElRef.current = null;
+      }
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text }),
+      });
+      if (!res.ok) throw new Error(`TTS failed: ${res.status}`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = new Audio(url);
+      audioElRef.current = a;
+      a.onended = () => URL.revokeObjectURL(url);
+      await a.play();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't play voice");
+    }
+  }
+
+  function stopSpeaking() {
+    if (audioElRef.current) {
+      audioElRef.current.pause();
+      audioElRef.current = null;
+    }
+  }
+
   const isBusy = status === "submitted" || status === "streaming";
 
   const qc = useQueryClient();
@@ -130,12 +223,13 @@ function ChatWindow({
   });
 
   function addFiles(files: File[]) {
-    const next: Attachment[] = files.map((f) => ({
+    const next: AttachmentWithFile[] = files.map((f) => ({
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       name: f.name || (f.type.startsWith("image/") ? "pasted-image" : "file"),
       type: f.type || "application/octet-stream",
       size: f.size,
       previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+      file: f,
     }));
     setAttachments((p) => [...p, ...next]);
   }
@@ -165,23 +259,116 @@ function ChatWindow({
     }
   }
 
+  const transcribeBlob = useCallback(
+    async (blob: Blob): Promise<string> => {
+      const form = new FormData();
+      form.append("file", blob, "recording.wav");
+      const res = await fetch("/api/stt", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || `Transcription failed: ${res.status}`);
+      }
+      const json = (await res.json()) as { text?: string };
+      return (json.text ?? "").trim();
+    },
+    [token],
+  );
+
+  async function toggleMic() {
+    if (recording) {
+      const rec = recorderRef.current;
+      recorderRef.current = null;
+      setRecording(false);
+      if (!rec) return;
+      try {
+        setTranscribing(true);
+        const blob = await rec.stop();
+        if (blob.size < 2048) {
+          toast.error("That recording was empty — try again.");
+          return;
+        }
+        const text = await transcribeBlob(blob);
+        if (!text) {
+          toast.error("Didn't catch that.");
+          return;
+        }
+        await sendComposed(text, []);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Mic failed");
+      } finally {
+        setTranscribing(false);
+      }
+      return;
+    }
+    try {
+      stopSpeaking();
+      const rec = await startMicRecorder();
+      recorderRef.current = rec;
+      setRecording(true);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Microphone permission denied");
+    }
+  }
+
+  async function sendComposed(text: string, attached: AttachmentWithFile[]) {
+    if (continuity === "resolved") setStatus.mutate("open");
+
+    // Split audio attachments into in-band transcription (anything that's
+    // not wav/mp3 is not safe to pass straight into the model via the
+    // AI SDK's openai-compatible converter — transcribe first, append as
+    // text). Keep wav/mp3, images, video, and documents as file parts.
+    const fileParts: { type: "file"; mediaType: string; url: string }[] = [];
+    let augmentedText = text;
+
+    for (const a of attached) {
+      const mt = a.type || "application/octet-stream";
+      const isAudio = mt.startsWith("audio/");
+      const safeAudio = mt === "audio/wav" || mt === "audio/mpeg" || mt === "audio/mp3";
+      if (isAudio && !safeAudio) {
+        try {
+          const transcript = await transcribeBlob(a.file);
+          if (transcript) {
+            augmentedText += (augmentedText ? "\n\n" : "") +
+              `[transcript of ${a.name}]: ${transcript}`;
+          }
+        } catch {
+          augmentedText += (augmentedText ? "\n\n" : "") +
+            `[audio attachment ${a.name} could not be transcribed]`;
+        }
+        continue;
+      }
+      try {
+        const dataUrl = await fileToDataUrl(a.file);
+        fileParts.push({ type: "file", mediaType: mt, url: dataUrl });
+      } catch {
+        augmentedText += (augmentedText ? "\n\n" : "") +
+          `[attachment ${a.name} could not be loaded]`;
+      }
+    }
+
+    const parts: UIMessage["parts"] = [];
+    for (const fp of fileParts) parts.push(fp);
+    if (augmentedText.trim()) parts.push({ type: "text", text: augmentedText });
+    if (parts.length === 0) return;
+
+    await sendMessage({ messageId: crypto.randomUUID(), role: "user", parts });
+  }
+
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
     const text = input.trim();
     if ((!text && attachments.length === 0) || isBusy) return;
-    const composed =
-      attachments.length > 0
-        ? `[attachments: ${attachments.map((a) => a.name).join(", ")}]${text ? "\n\n" + text : ""}`
-        : text;
+    const queued = attachments;
     setInput("");
-    setAttachments((p) => {
-      p.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
-      return [];
-    });
-    if (continuity === "resolved") setStatus.mutate("open");
+    setAttachments([]);
     try {
-      await sendMessage({ text: composed });
+      await sendComposed(text, queued);
     } finally {
+      queued.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
       setTimeout(() => inputRef.current?.focus(), 0);
     }
   }
@@ -213,6 +400,25 @@ function ChatWindow({
               <CircleDot className="h-3.5 w-3.5" /> Open
             </>
           )}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setVoiceMode((v) => {
+              const next = !v;
+              if (!next) stopSpeaking();
+              return next;
+            });
+          }}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors ${
+            voiceMode
+              ? "border-primary/40 text-primary hover:bg-primary/10"
+              : "border-border text-muted-foreground hover:text-foreground"
+          }`}
+          title={voiceMode ? "Voice replies on" : "Voice replies off"}
+        >
+          {voiceMode ? <Volume2 className="h-3.5 w-3.5" /> : <VolumeX className="h-3.5 w-3.5" />}
+          {voiceMode ? "Voice" : "Silent"}
         </button>
         <ChatSettings advanced={advanced} setAdvanced={setAdvanced} />
       </div>
@@ -257,11 +463,32 @@ function ChatWindow({
                   submit();
                 }
               }}
-              placeholder="Speak. The archive is listening."
+              placeholder={recording ? "Listening…" : "Speak. The archive is listening."}
               rows={1}
-              className="flex-1 resize-none rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+              disabled={recording || transcribing}
+              className="flex-1 resize-none rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary disabled:opacity-60"
               style={{ maxHeight: 240 }}
             />
+            <button
+              type="button"
+              onClick={toggleMic}
+              disabled={transcribing || isBusy}
+              className={`inline-flex h-11 w-11 items-center justify-center rounded-md border transition-colors ${
+                recording
+                  ? "border-destructive bg-destructive/10 text-destructive animate-pulse"
+                  : "border-border text-muted-foreground hover:text-foreground hover:bg-secondary"
+              } disabled:opacity-40`}
+              aria-label={recording ? "Stop recording" : "Start recording"}
+              title={recording ? "Stop recording" : "Hold a conversation"}
+            >
+              {transcribing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : recording ? (
+                <MicOff className="h-4 w-4" />
+              ) : (
+                <Mic className="h-4 w-4" />
+              )}
+            </button>
             <button
               type="submit"
               disabled={isBusy || (!input.trim() && attachments.length === 0)}
@@ -278,6 +505,9 @@ function ChatWindow({
           <div className="mt-2 flex items-center gap-2">
             <AttachmentsButton onAdd={addFiles} />
             {advanced && <ModelPicker />}
+            {recording && (
+              <span className="text-xs text-destructive animate-pulse">● recording</span>
+            )}
           </div>
         </div>
       </form>
@@ -291,15 +521,48 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
     .map((p) => (p.type === "text" ? p.text : ""))
     .filter(Boolean)
     .join("");
+  const files = msg.parts.filter(
+    (p): p is { type: "file"; mediaType: string; url: string } => p.type === "file",
+  );
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap ${
+        className={`max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap space-y-2 ${
           isUser
             ? "bg-primary text-primary-foreground"
             : "bg-card border border-border text-foreground"
         }`}
       >
+        {files.length > 0 && (
+          <div className="flex flex-wrap gap-2">
+            {files.map((f, i) =>
+              f.mediaType.startsWith("image/") ? (
+                <img
+                  key={i}
+                  src={f.url}
+                  alt=""
+                  className="max-h-48 rounded-md border border-border/50"
+                />
+              ) : f.mediaType.startsWith("video/") ? (
+                <video
+                  key={i}
+                  src={f.url}
+                  controls
+                  className="max-h-56 rounded-md border border-border/50"
+                />
+              ) : f.mediaType.startsWith("audio/") ? (
+                <audio key={i} src={f.url} controls className="max-w-full" />
+              ) : (
+                <span
+                  key={i}
+                  className="rounded-md border border-border/50 px-2 py-1 text-xs"
+                >
+                  {f.mediaType || "file"}
+                </span>
+              ),
+            )}
+          </div>
+        )}
         {text}
       </div>
     </div>
