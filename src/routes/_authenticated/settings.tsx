@@ -24,6 +24,14 @@ const LOVABLE_MODELS = [
   "openai/gpt-5.4",
 ];
 
+const OPENAI_DIRECT_MODELS = [
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-4.1",
+  "gpt-4.1-mini",
+  "o4-mini",
+];
+
 function SettingsPage() {
   const qc = useQueryClient();
   const q = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
