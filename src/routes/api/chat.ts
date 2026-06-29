@@ -412,29 +412,40 @@ export const Route = createFileRoute("/api/chat")({
         // up looking like a refusal AND the user has a fallback provider
         // configured, we open a second assistant message and stream the
         // fallback response into it — same shape as OpenRouter's auto-router.
+        //
+        // Pre-emptive route: if the user's prompt obviously sits in a band
+        // corporate models always refuse AND a fallback is configured, skip
+        // the primary entirely and go straight to the fallback.
+        const preempt = !!fallbackModel && shouldPreemptToFallback(userText);
+
         const uiStream = createUIMessageStream({
           execute: async ({ writer }) => {
             let primaryText = "";
-            const primary = streamText({
-              model: primaryModel,
-              system,
-              messages: convertedMessages,
-              onFinish: (e) => {
-                primaryText = e.text ?? "";
-              },
-            });
-            writer.merge(primary.toUIMessageStream({ sendStart: true, sendFinish: true }));
-            // Wait until the primary stream is fully done before deciding
-            // whether to fire the fallback.
-            try {
-              await primary.consumeStream();
-            } catch {
-              /* primary stream errors surface to the client via the stream itself */
+            if (!preempt) {
+              const primary = streamText({
+                model: primaryModel,
+                system,
+                messages: convertedMessages,
+                onFinish: (e) => {
+                  primaryText = e.text ?? "";
+                },
+              });
+              writer.merge(primary.toUIMessageStream({ sendStart: true, sendFinish: true }));
+              // Wait until the primary stream is fully done before deciding
+              // whether to fire the fallback.
+              try {
+                await primary.consumeStream();
+              } catch {
+                /* primary stream errors surface to the client via the stream itself */
+              }
+
+              await persistAssistant(primaryText, { tier: "primary" });
             }
 
-            await persistAssistant(primaryText, { tier: "primary" });
+            const needFallback =
+              !!fallbackModel && (preempt || looksLikeRefusal(primaryText));
 
-            if (!fallbackModel || !looksLikeRefusal(primaryText)) {
+            if (!needFallback) {
               // Regenerate multi-topic title (best-effort).
               try {
                 const { summarizeThreadTitle } = await import(
