@@ -431,7 +431,7 @@ function ChatWindow({
     if (augmentedText.trim()) parts.push({ type: "text", text: augmentedText });
     if (parts.length === 0) return;
 
-    await sendMessage({ messageId: crypto.randomUUID(), role: "user", parts });
+    await sendMessage({ role: "user", parts });
   }
 
   async function submit(e?: React.FormEvent) {
