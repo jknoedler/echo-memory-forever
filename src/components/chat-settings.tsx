@@ -217,6 +217,7 @@ export function ModelPicker() {
   const envOpenAiActive = !activeId && providerKind === "openai";
   const envGroqActive = !activeId && providerKind === "groq";
   const envLlamaActive = !activeId && providerKind === "llama";
+  const envVeniceActive = !activeId && providerKind === "venice";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
@@ -227,7 +228,10 @@ export function ModelPicker() {
         ? `Groq · ${settingsQ.data?.model || "llama-3.3-70b-versatile"}`
         : envLlamaActive
           ? `Llama · ${settingsQ.data?.model || "Llama-3.3-70B-Instruct"}`
-          : "Auto (recommended)";
+          : envVeniceActive
+            ? `Venice · ${settingsQ.data?.model || "venice-uncensored"}`
+            : "Auto (recommended)";
+
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
