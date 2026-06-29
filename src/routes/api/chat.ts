@@ -470,7 +470,7 @@ export const Route = createFileRoute("/api/chat")({
               : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
             await persistAssistant(persistedFb, {
               tier: "fallback",
-              fallback_catalog: fallbackProvider?.catalog_id ?? null,
+              fallback_catalog: fallbackLabel,
             });
 
             try {
