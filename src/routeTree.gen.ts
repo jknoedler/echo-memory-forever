@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiYoutubeRouteImport } from './routes/api/youtube'
 import { Route as ApiTtsRouteImport } from './routes/api/tts'
 import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
@@ -41,6 +42,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiYoutubeRoute = ApiYoutubeRouteImport.update({
+  id: '/api/youtube',
+  path: '/api/youtube',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiTtsRoute = ApiTtsRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/api/chat': typeof ApiChatRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/youtube': typeof ApiYoutubeRoute
   '/c/$threadId': typeof AuthenticatedCThreadIdRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/api/chat': typeof ApiChatRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/youtube': typeof ApiYoutubeRoute
   '/c/$threadId': typeof AuthenticatedCThreadIdRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
@@ -139,6 +147,7 @@ export interface FileRoutesById {
   '/api/chat': typeof ApiChatRoute
   '/api/stt': typeof ApiSttRoute
   '/api/tts': typeof ApiTtsRoute
+  '/api/youtube': typeof ApiYoutubeRoute
   '/_authenticated/c/$threadId': typeof AuthenticatedCThreadIdRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
@@ -156,6 +165,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/stt'
     | '/api/tts'
+    | '/api/youtube'
     | '/c/$threadId'
     | '/api/public/biometrics'
   fileRoutesByTo: FileRoutesByTo
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/stt'
     | '/api/tts'
+    | '/api/youtube'
     | '/c/$threadId'
     | '/api/public/biometrics'
   id:
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
     | '/api/chat'
     | '/api/stt'
     | '/api/tts'
+    | '/api/youtube'
     | '/_authenticated/c/$threadId'
     | '/api/public/biometrics'
   fileRoutesById: FileRoutesById
@@ -199,6 +211,7 @@ export interface RootRouteChildren {
   ApiChatRoute: typeof ApiChatRoute
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
+  ApiYoutubeRoute: typeof ApiYoutubeRoute
   ApiPublicBiometricsRoute: typeof ApiPublicBiometricsRoute
 }
 
@@ -230,6 +243,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/youtube': {
+      id: '/api/youtube'
+      path: '/api/youtube'
+      fullPath: '/api/youtube'
+      preLoaderRoute: typeof ApiYoutubeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/tts': {
@@ -334,6 +354,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiChatRoute: ApiChatRoute,
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
+  ApiYoutubeRoute: ApiYoutubeRoute,
   ApiPublicBiometricsRoute: ApiPublicBiometricsRoute,
 }
 export const routeTree = rootRouteImport
