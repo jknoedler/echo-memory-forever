@@ -104,5 +104,7 @@ export const listEnvProviders = createServerFn({ method: "GET" })
       openai: !!process.env.OPENAI_API_KEY,
       groq: !!process.env.GROQ_API_KEY,
       llama: !!process.env.LLAMA_API_KEY,
+      venice: !!process.env.VENICE_API_KEY,
     };
   });
+
