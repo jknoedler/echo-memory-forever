@@ -24,6 +24,8 @@ import {
 } from "@/components/chat-attachments";
 import { ChatSettings, ModelPicker, useAdvanced } from "@/components/chat-settings";
 import { startMicRecorder, type MicRecorder } from "@/lib/voice";
+import { extractYouTubeIds, type YouTubeIngest } from "@/lib/youtube";
+import { buildAudioViz } from "@/lib/audio-viz";
 
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
   component: ChatPage,
