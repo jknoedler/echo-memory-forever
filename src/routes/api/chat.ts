@@ -163,8 +163,10 @@ export const Route = createFileRoute("/api/chat")({
           api_key: string | null;
           default_model: string | null;
         };
-        let fallbackEnvKind: "groq" | "openai" | "llama" | null = null;
-        if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
+        let fallbackEnvKind: "groq" | "openai" | "llama" | "venice" | null = null;
+        if (settings?.fallback_provider_kind === "venice" && process.env.VENICE_API_KEY) {
+          fallbackEnvKind = "venice";
+        } else if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
           fallbackEnvKind = "groq";
         } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
           fallbackEnvKind = "openai";
@@ -180,7 +182,16 @@ export const Route = createFileRoute("/api/chat")({
             .eq("id", settings.fallback_provider_id)
             .maybeSingle();
           if (fb) fallbackProvider = fb;
+        } else if (
+          // No explicit fallback configured — default to Venice when the
+          // project key is present. Venice is the house uncensored fallback.
+          !settings?.fallback_provider_kind &&
+          !settings?.fallback_provider_id &&
+          process.env.VENICE_API_KEY
+        ) {
+          fallbackEnvKind = "venice";
         }
+
 
 
 
