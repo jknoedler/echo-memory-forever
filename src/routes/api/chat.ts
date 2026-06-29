@@ -112,7 +112,7 @@ export const Route = createFileRoute("/api/chat")({
         const { data: settings } = await supabase
           .from("user_settings")
           .select(
-            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override",
+            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id",
           )
           .eq("user_id", userId)
           .maybeSingle();
@@ -124,6 +124,23 @@ export const Route = createFileRoute("/api/chat")({
           custom_api_key: settings?.custom_api_key ?? null,
           custom_model_id: settings?.custom_model_id ?? null,
         };
+
+        // If user has selected a saved provider from their library, load it.
+        let activeProvider = null as null | {
+          catalog_id: string;
+          base_url: string | null;
+          api_key: string | null;
+          default_model: string | null;
+        };
+        if (settings?.active_provider_id) {
+          const { data: ap } = await supabase
+            .from("user_providers")
+            .select("catalog_id, base_url, api_key, default_model")
+            .eq("id", settings.active_provider_id)
+            .maybeSingle();
+          if (ap) activeProvider = ap;
+        }
+
 
         const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
         const userText = lastUserMsg ? extractUserText(lastUserMsg) : "";
@@ -205,6 +222,7 @@ export const Route = createFileRoute("/api/chat")({
           const resolved = resolveProvider(cfg, {
             lovableApiKey: process.env.LOVABLE_API_KEY,
             openaiApiKey: process.env.OPENAI_API_KEY,
+            activeProvider,
           });
           model = resolved.model;
         } catch (e) {

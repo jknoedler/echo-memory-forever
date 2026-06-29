@@ -1,6 +1,12 @@
-// Multi-provider router. Returns an AI-SDK language model for a user's
-// configured provider. Default = Lovable AI Gateway. Custom = any
-// OpenAI-compatible endpoint (Ollama, LM Studio, self-hosted llama, OpenRouter, etc.)
+// Multi-provider router. Returns an AI-SDK language model.
+//
+// Priority:
+//   1. activeProvider (a row from user_providers) — saved API key for a
+//      hosted catalog entry, OR a local runtime baseUrl. Spoken to via
+//      OpenAI-compatible chat completions.
+//   2. cfg.provider === "openai" — direct OpenAI using project OPENAI_API_KEY.
+//   3. cfg.provider === "custom" — raw base URL + key configured in settings.
+//   4. Default — Lovable AI Gateway (Claude by default to the user).
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
@@ -12,18 +18,49 @@ export type UserAiConfig = {
   custom_model_id: string | null;
 };
 
+export type ActiveProvider = {
+  catalog_id: string;
+  base_url: string | null;
+  api_key: string | null;
+  default_model: string | null;
+};
+
 export type ResolvedProvider = {
   model: ReturnType<ReturnType<typeof createLovableAiGatewayProvider>>;
   providerName: string;
   modelId: string;
-  // Optional: a Lovable gateway handle (only set when provider === lovable)
   lovableGateway?: ReturnType<typeof createLovableAiGatewayProvider>;
 };
 
 export function resolveProvider(
   cfg: UserAiConfig,
-  opts: { lovableApiKey?: string; openaiApiKey?: string; initialRunId?: string } = {},
+  opts: {
+    lovableApiKey?: string;
+    openaiApiKey?: string;
+    initialRunId?: string;
+    activeProvider?: ActiveProvider | null;
+  } = {},
 ): ResolvedProvider {
+  // 1. Saved provider from the user's library.
+  if (opts.activeProvider) {
+    const ap = opts.activeProvider;
+    const baseURL = ap.base_url?.trim();
+    if (!baseURL) {
+      throw new Error(`Saved provider "${ap.catalog_id}" has no base URL configured.`);
+    }
+    const modelId = (cfg.model || ap.default_model || "").trim();
+    if (!modelId) {
+      throw new Error(`No model selected for saved provider "${ap.catalog_id}".`);
+    }
+    const apiKey = ap.api_key?.trim();
+    const provider = createOpenAICompatible({
+      name: ap.catalog_id,
+      baseURL,
+      headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+    });
+    return { model: provider(modelId), providerName: ap.catalog_id, modelId };
+  }
+
   if (cfg.provider === "openai") {
     if (!opts.openaiApiKey) {
       throw new Error("OpenAI provider selected but OPENAI_API_KEY is not configured.");
@@ -49,14 +86,9 @@ export function resolveProvider(
       baseURL,
       headers: apiKey && apiKey !== "not-required" ? { Authorization: `Bearer ${apiKey}` } : {},
     });
-    return {
-      model: provider(modelId),
-      providerName: "custom",
-      modelId,
-    };
+    return { model: provider(modelId), providerName: "custom", modelId };
   }
 
-  // Default: Lovable AI Gateway
   if (!opts.lovableApiKey) {
     throw new Error("LOVABLE_API_KEY is not configured for this project.");
   }
