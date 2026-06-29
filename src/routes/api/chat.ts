@@ -461,10 +461,7 @@ export const Route = createFileRoute("/api/chat")({
           },
         });
 
-        return createUIMessageStreamResponse({
-          stream: uiStream,
-          originalMessages: messages,
-        });
+        return createUIMessageStreamResponse({ stream: uiStream });
       },
     },
   },
