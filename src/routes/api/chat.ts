@@ -15,7 +15,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { convertToModelMessages, streamText, type UIMessage } from "ai";
 import { createClient } from "@supabase/supabase-js";
 import { resolveProvider } from "@/lib/ai-provider.server";
-import { SYSTEM_OF_JOSIAH } from "@/lib/persona";
+import { DED_PERSONA } from "@/lib/persona";
 import { embedText } from "@/lib/embeddings.server";
 import type { Database } from "@/integrations/supabase/types";
 
