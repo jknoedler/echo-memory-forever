@@ -39,7 +39,7 @@ export function ChatSettings({
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const fallbackM = useMutation({
-    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | null }) =>
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | null }) =>
       updateMySettings({
         data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
       }),
@@ -49,6 +49,7 @@ export function ChatSettings({
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
