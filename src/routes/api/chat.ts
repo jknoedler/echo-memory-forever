@@ -202,7 +202,10 @@ export const Route = createFileRoute("/api/chat")({
         // Resolve provider
         let model;
         try {
-          const resolved = resolveProvider(cfg, { lovableApiKey: process.env.LOVABLE_API_KEY });
+          const resolved = resolveProvider(cfg, {
+            lovableApiKey: process.env.LOVABLE_API_KEY,
+            openaiApiKey: process.env.OPENAI_API_KEY,
+          });
           model = resolved.model;
         } catch (e) {
           return new Response(
