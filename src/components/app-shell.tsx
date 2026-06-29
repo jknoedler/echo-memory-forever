@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ClipboardList, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo } from "@/components/mement0-logo";
 import { supabase } from "@/integrations/supabase/client";
@@ -128,6 +128,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="border-t border-border p-2 space-y-0.5">
           <NavItem to="/tasks" icon={<ClipboardList className="h-4 w-4" />} label="Staged tasks" />
+          <NavItem to="/library" icon={<Library className="h-4 w-4" />} label="Model library" />
           <NavItem to="/settings" icon={<SettingsIcon className="h-4 w-4" />} label="Settings" />
         </div>
 
@@ -169,7 +170,7 @@ function NavItem({
   icon,
   label,
 }: {
-  to: "/tasks" | "/settings";
+  to: "/tasks" | "/settings" | "/library";
   icon: ReactNode;
   label: string;
 }) {
