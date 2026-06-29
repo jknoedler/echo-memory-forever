@@ -83,19 +83,20 @@ export function Mement0Logo({
 export function Mement0Hero({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`flex flex-col items-center justify-center text-foreground ${className}`}
+      className={`flex flex-col items-center justify-center ${className}`}
       aria-label="Mement\u00d8 — MORE"
     >
-      <div
-        className="leading-none"
-        style={{
-          ...bodoni,
-          fontWeight: 700,
-          fontSize: "clamp(4rem, 18vw, 9rem)",
-          letterSpacing: "-0.02em",
-        }}
-      >
-        Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
+      <div className="leading-none" style={{ ...bodoni, fontWeight: 700, fontSize: "clamp(4rem, 18vw, 9rem)", letterSpacing: "-0.02em" }}>
+        <span
+          style={{
+            color: "black",
+            WebkitTextStroke: "1px white",
+            textShadow: "0 0 1px white",
+          }}
+        >
+          Mement
+        </span>
+        <span style={{ fontWeight: 400, color: "white" }}>&Oslash;</span>
       </div>
       <div
         className="mt-3 text-foreground"
