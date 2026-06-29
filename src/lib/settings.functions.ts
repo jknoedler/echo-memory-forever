@@ -1,0 +1,64 @@
+import { createServerFn } from "@tanstack/react-start";
+import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+
+export const getMySettings = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase
+      .from("user_settings")
+      .select(
+        "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret",
+      )
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (error) throw new Error(error.message);
+    if (!data) {
+      // Fallback in case the signup trigger didn't fire
+      const { data: ins, error: insErr } = await context.supabase
+        .from("user_settings")
+        .insert({ user_id: context.userId })
+        .select(
+          "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret",
+        )
+        .single();
+      if (insErr) throw new Error(insErr.message);
+      return ins;
+    }
+    return data;
+  });
+
+const SettingsUpdate = z.object({
+  provider: z.enum(["lovable", "custom"]).optional(),
+  model: z.string().max(200).optional(),
+  custom_base_url: z.string().url().nullable().optional(),
+  custom_api_key: z.string().max(500).nullable().optional(),
+  custom_model_id: z.string().max(200).nullable().optional(),
+  system_prompt_override: z.string().max(8000).nullable().optional(),
+  hotl_auto_execute: z.boolean().optional(),
+});
+
+export const updateMySettings = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => SettingsUpdate.parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("user_settings")
+      .update(data)
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const rotateBiometricsSecret = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const bytes = crypto.getRandomValues(new Uint8Array(24));
+    const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+    const { error } = await context.supabase
+      .from("user_settings")
+      .update({ biometrics_secret: hex })
+      .eq("user_id", context.userId);
+    if (error) throw new Error(error.message);
+    return { secret: hex };
+  });
