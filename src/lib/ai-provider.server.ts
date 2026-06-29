@@ -104,7 +104,21 @@ export function resolveProvider(
     return { model: provider(modelId), providerName: "llama", modelId };
   }
 
+  if (cfg.provider === "venice") {
+    if (!opts.veniceApiKey) {
+      throw new Error("Venice provider selected but VENICE_API_KEY is not configured.");
+    }
+    const modelId = cfg.model || "venice-uncensored";
+    const provider = createOpenAICompatible({
+      name: "venice",
+      baseURL: "https://api.venice.ai/api/v1",
+      headers: { Authorization: `Bearer ${opts.veniceApiKey}` },
+    });
+    return { model: provider(modelId), providerName: "venice", modelId };
+  }
+
   if (cfg.provider === "custom") {
+
     const baseURL = cfg.custom_base_url?.trim();
     const apiKey = cfg.custom_api_key?.trim() || "not-required";
     const modelId = cfg.custom_model_id?.trim() || cfg.model;
