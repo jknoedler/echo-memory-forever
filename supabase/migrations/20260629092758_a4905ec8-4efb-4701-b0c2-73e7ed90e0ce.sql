@@ -1,0 +1,1 @@
+ALTER TABLE public.threads ADD COLUMN IF NOT EXISTS continuity_status text NOT NULL DEFAULT 'open'; ALTER TABLE public.threads ADD COLUMN IF NOT EXISTS continuity_note text;
