@@ -24,6 +24,8 @@ import {
 } from "@/components/chat-attachments";
 import { ChatSettings, ModelPicker, useAdvanced } from "@/components/chat-settings";
 import { startMicRecorder, type MicRecorder } from "@/lib/voice";
+import { extractYouTubeIds, type YouTubeIngest } from "@/lib/youtube";
+import { buildAudioViz } from "@/lib/audio-viz";
 
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
   component: ChatPage,
@@ -314,39 +316,113 @@ function ChatWindow({
     }
   }
 
+  async function ingestYouTube(videoUrl: string): Promise<YouTubeIngest | null> {
+    try {
+      const res = await fetch("/api/youtube", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ url: videoUrl }),
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as YouTubeIngest;
+    } catch {
+      return null;
+    }
+  }
+
   async function sendComposed(text: string, attached: AttachmentWithFile[]) {
     if (continuity === "resolved") setStatus.mutate("open");
 
-    // Split audio attachments into in-band transcription (anything that's
-    // not wav/mp3 is not safe to pass straight into the model via the
-    // AI SDK's openai-compatible converter — transcribe first, append as
-    // text). Keep wav/mp3, images, video, and documents as file parts.
     const fileParts: { type: "file"; mediaType: string; url: string }[] = [];
     let augmentedText = text;
 
+    // 1. YouTube URLs in the message → pull transcript + thumbnail
+    //    storyboard so DED can "watch" the video.
+    const ytIds = extractYouTubeIds(text);
+    if (ytIds.length) {
+      toast.info(`Ingesting ${ytIds.length} YouTube link${ytIds.length > 1 ? "s" : ""}…`);
+      const ingests = await Promise.all(
+        ytIds.map((id) => ingestYouTube(`https://www.youtube.com/watch?v=${id}`)),
+      );
+      for (const ing of ingests) {
+        if (!ing) continue;
+        for (const url of ing.thumbnails) {
+          fileParts.push({ type: "file", mediaType: "image/jpeg", url });
+        }
+        const header = `[YouTube ingest: ${ing.title ?? ing.videoId}${ing.author ? ` — ${ing.author}` : ""} · ${ing.url}]`;
+        const transcriptBlock = ing.transcript
+          ? `Transcript (captions):\n${ing.transcript}`
+          : "No captions were available for this video. The thumbnails above are the only frames I could pull — treat them as a 4-frame storyboard.";
+        augmentedText +=
+          (augmentedText ? "\n\n" : "") + `${header}\n${transcriptBlock}`;
+      }
+    }
+
+    // 2. Per-attachment handling.
+    //    - Audio: in addition to transcribing speech, render a waveform +
+    //      spectrogram so the vision model can read dynamics and frequency
+    //      content (lyrics/chords workaround for SoundCloud, demos, etc.).
+    //    - Non-wav/mp3 audio still gets transcribed; wav/mp3 also passes
+    //      through as a file part for Gemini to ingest directly.
+    //    - Everything else: ride through as a file part.
     for (const a of attached) {
       const mt = a.type || "application/octet-stream";
       const isAudio = mt.startsWith("audio/");
       const safeAudio = mt === "audio/wav" || mt === "audio/mpeg" || mt === "audio/mp3";
-      if (isAudio && !safeAudio) {
+
+      if (isAudio) {
+        // Render the visualizations first — these are the workaround for
+        // "the model can't actually hear."
         try {
-          const transcript = await transcribeBlob(a.file);
-          if (transcript) {
-            augmentedText += (augmentedText ? "\n\n" : "") +
-              `[transcript of ${a.name}]: ${transcript}`;
+          const viz = await buildAudioViz(a.file);
+          const [wave, spec] = await Promise.all([
+            fileToDataUrl(viz.waveform),
+            fileToDataUrl(viz.spectrogram),
+          ]);
+          fileParts.push({ type: "file", mediaType: "image/png", url: wave });
+          fileParts.push({ type: "file", mediaType: "image/png", url: spec });
+          augmentedText +=
+            (augmentedText ? "\n\n" : "") +
+            `[audio analysis pack for ${a.name} · ${viz.durationSec.toFixed(1)}s @ ${viz.sampleRate}Hz]\nAttached: waveform (dynamics, structure, silence) and log-frequency spectrogram (tonal balance, brightness, mix density). Read them as the audio.`;
+        } catch (e) {
+          augmentedText +=
+            (augmentedText ? "\n\n" : "") +
+            `[audio viz for ${a.name} failed: ${e instanceof Error ? e.message : "decode error"}]`;
+        }
+
+        if (safeAudio) {
+          try {
+            const dataUrl = await fileToDataUrl(a.file);
+            fileParts.push({ type: "file", mediaType: mt, url: dataUrl });
+          } catch {
+            /* fall through to transcript only */
           }
-        } catch {
-          augmentedText += (augmentedText ? "\n\n" : "") +
-            `[audio attachment ${a.name} could not be transcribed]`;
+        } else {
+          try {
+            const transcript = await transcribeBlob(a.file);
+            if (transcript) {
+              augmentedText +=
+                (augmentedText ? "\n\n" : "") +
+                `[speech transcript of ${a.name}]: ${transcript}`;
+            }
+          } catch {
+            augmentedText +=
+              (augmentedText ? "\n\n" : "") +
+              `[speech in ${a.name} could not be transcribed — rely on the spectrogram/waveform]`;
+          }
         }
         continue;
       }
+
       try {
         const dataUrl = await fileToDataUrl(a.file);
         fileParts.push({ type: "file", mediaType: mt, url: dataUrl });
       } catch {
-        augmentedText += (augmentedText ? "\n\n" : "") +
-          `[attachment ${a.name} could not be loaded]`;
+        augmentedText +=
+          (augmentedText ? "\n\n" : "") + `[attachment ${a.name} could not be loaded]`;
       }
     }
 
