@@ -39,7 +39,7 @@ export function ChatSettings({
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const fallbackM = useMutation({
-    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | null }) =>
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | null }) =>
       updateMySettings({
         data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
       }),
@@ -132,16 +132,22 @@ export function ChatSettings({
                       ? "env:groq"
                       : settingsQ.data?.fallback_provider_kind === "openai"
                         ? "env:openai"
-                        : settingsQ.data?.fallback_provider_id ?? ""
+                        : settingsQ.data?.fallback_provider_kind === "llama"
+                          ? "env:llama"
+                          : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
                     else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
+                    else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
                   <option value="">Off</option>
+                  {envQ.data?.llama && (
+                    <option value="env:llama">Llama (project key) · Llama 3.3 70B</option>
+                  )}
                   {envQ.data?.groq && (
                     <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
                   )}
@@ -178,7 +184,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -199,6 +205,7 @@ export function ModelPicker() {
   const providerKind = settingsQ.data?.provider ?? "lovable";
   const envOpenAiActive = !activeId && providerKind === "openai";
   const envGroqActive = !activeId && providerKind === "groq";
+  const envLlamaActive = !activeId && providerKind === "llama";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
@@ -207,7 +214,9 @@ export function ModelPicker() {
       ? `OpenAI · ${settingsQ.data?.model || "gpt-4o-mini"}`
       : envGroqActive
         ? `Groq · ${settingsQ.data?.model || "llama-3.3-70b-versatile"}`
-        : "Auto (recommended)";
+        : envLlamaActive
+          ? `Llama · ${settingsQ.data?.model || "Llama-3.3-70B-Instruct"}`
+          : "Auto (recommended)";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
@@ -233,6 +242,15 @@ export function ModelPicker() {
       provider_id: null,
       provider_kind: "groq",
       model: "llama-3.3-70b-versatile",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvLlama() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "llama",
+      model: "Llama-3.3-70B-Instruct",
     });
     setOpen(false);
   }
@@ -278,8 +296,31 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.llama && !connectedByCat.get("llama") && (
+            <button
+              type="button"
+              onClick={pickEnvLlama}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envLlamaActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Llama (project key)</span>
+                <span className="block text-[10px] truncate">
+                  Llama-3.3-70B-Instruct · uses LLAMA_API_KEY
+                </span>
+              </span>
+              {envLlamaActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           {envQ.data?.groq && !connectedByCat.get("groq") && (
             <button
               type="button"

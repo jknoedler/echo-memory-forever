@@ -70,7 +70,7 @@ export const setActiveProvider = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       provider_id: z.string().uuid().nullable(),
-      provider_kind: z.enum(["lovable", "openai", "groq", "custom"]).optional(),
+      provider_kind: z.enum(["lovable", "openai", "groq", "llama", "custom"]).optional(),
       model: z.string().max(200).optional(),
     }).parse(d),
   )
@@ -102,5 +102,6 @@ export const listEnvProviders = createServerFn({ method: "GET" })
     return {
       openai: !!process.env.OPENAI_API_KEY,
       groq: !!process.env.GROQ_API_KEY,
+      llama: !!process.env.LLAMA_API_KEY,
     };
   });
