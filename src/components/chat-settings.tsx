@@ -109,6 +109,51 @@ export function ChatSettings({
               </span>
             </span>
           </label>
+
+          {advanced && (
+            <>
+              <div className="my-3 h-px bg-border" />
+              <div className="px-1">
+                <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                  Capability fallback
+                </p>
+                <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
+                  If the primary model refuses or can't answer, auto-retry the
+                  same turn on this provider. Uses your library key.
+                </p>
+                <select
+                  className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                  value={settingsQ.data?.fallback_provider_id ?? ""}
+                  onChange={(e) =>
+                    fallbackM.mutate(e.target.value || null)
+                  }
+                >
+                  <option value="">Off</option>
+                  {(providersQ.data ?? []).map((p) => {
+                    const cat = findCatalog(p.catalog_id);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {cat?.name ?? p.label} ·{" "}
+                        {p.default_model || cat?.models[0] || "default"}
+                      </option>
+                    );
+                  })}
+                </select>
+                {(providersQ.data ?? []).length === 0 && (
+                  <p className="mt-1.5 text-[10px] text-muted-foreground">
+                    Add a provider in{" "}
+                    <a
+                      href="/library"
+                      className="underline hover:text-foreground"
+                    >
+                      /library
+                    </a>{" "}
+                    first.
+                  </p>
+                )}
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
