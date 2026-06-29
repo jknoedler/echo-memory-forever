@@ -34,7 +34,7 @@ function AppHome() {
           <Brain className="h-6 w-6 text-primary" />
         </div>
         <h1 className="mt-6 text-3xl font-display tracking-tight">
-          Begin <Mement0Mark />
+          Begin Mement<span className="ember-text">0</span>
         </h1>
         <p className="mt-3 text-muted-foreground">
           The archive is empty. Start the first thread and every word becomes memory.
