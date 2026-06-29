@@ -299,11 +299,13 @@ export const Route = createFileRoute("/api/chat")({
         if (fallbackEnvKind) {
           try {
             const fbModelId =
-              fallbackEnvKind === "groq"
-                ? "llama-3.3-70b-versatile"
-                : fallbackEnvKind === "llama"
-                  ? "Llama-3.3-70B-Instruct"
-                  : "gpt-4o-mini";
+              fallbackEnvKind === "venice"
+                ? "venice-uncensored"
+                : fallbackEnvKind === "groq"
+                  ? "llama-3.3-70b-versatile"
+                  : fallbackEnvKind === "llama"
+                    ? "Llama-3.3-70B-Instruct"
+                    : "gpt-4o-mini";
             const resolvedFb = resolveProvider(
               { ...cfg, provider: fallbackEnvKind, model: fbModelId },
               {
@@ -311,6 +313,7 @@ export const Route = createFileRoute("/api/chat")({
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
                 llamaApiKey: process.env.LLAMA_API_KEY,
+                veniceApiKey: process.env.VENICE_API_KEY,
                 activeProvider: null,
               },
             );
@@ -328,6 +331,7 @@ export const Route = createFileRoute("/api/chat")({
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
                 llamaApiKey: process.env.LLAMA_API_KEY,
+                veniceApiKey: process.env.VENICE_API_KEY,
                 activeProvider: fallbackProvider,
               },
             );
@@ -337,6 +341,7 @@ export const Route = createFileRoute("/api/chat")({
             fallbackModel = null;
           }
         }
+
 
         // Save the user message now (before streaming) so it shows up even
         // if the stream fails midway.
