@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable";
-import { Mement0Mark } from "@/components/mement0-logo";
+import { Mement0Hero } from "@/components/mement0-logo";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({ meta: [{ title: "Sign in — Mement0" }] }),
@@ -75,8 +75,7 @@ function AuthPage() {
     <div className="min-h-screen flex items-center justify-center px-5">
       <div className="w-full max-w-md">
         <div className="text-center mb-10">
-          <Mement0Mark className="text-3xl" />
-          <p className="mt-3 text-sm text-muted-foreground tracking-widest">MORE / 0 LOSS</p>
+          <Mement0Hero className="mx-auto h-48 w-auto" />
         </div>
 
         <div className="rounded-xl border border-border bg-card p-7 shadow-2xl">

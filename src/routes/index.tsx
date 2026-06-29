@@ -4,7 +4,7 @@ import { SendHorizonal, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createThread } from "@/lib/threads.functions";
-import { Mement0Mark } from "@/components/mement0-logo";
+import { Mement0Logo, Mement0Hero } from "@/components/mement0-logo";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -72,7 +72,7 @@ function Landing() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-5 py-4">
-        <Mement0Mark className="text-lg" />
+        <Mement0Logo to="/" />
         <nav className="flex items-center gap-5 text-sm text-muted-foreground">
           <Link to="/about" className="hover:text-foreground transition-colors">
             About
@@ -90,6 +90,7 @@ function Landing() {
       </header>
 
       <main className="flex-1 flex flex-col items-center justify-center px-5">
+        <Mement0Hero className="mb-10 h-56 w-auto md:h-72" />
         <form onSubmit={submit} className="w-full max-w-2xl">
           <div className="flex items-end gap-2 rounded-2xl border border-border bg-card/60 p-2 focus-within:border-primary/60 transition-colors ember-glow">
             <textarea
@@ -120,11 +121,11 @@ function Landing() {
               )}
             </button>
           </div>
-          <p className="mt-3 text-center text-xs text-muted-foreground">
-            {authed === false
-              ? "Sign in once. Your archive remembers everything after that."
-              : "MORE · 0 loss · the 0 is for L's"}
-          </p>
+          {authed === false && (
+            <p className="mt-3 text-center text-xs text-muted-foreground">
+              Sign in once. Your archive remembers everything after that.
+            </p>
+          )}
         </form>
       </main>
 

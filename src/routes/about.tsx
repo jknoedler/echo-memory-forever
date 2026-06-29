@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Brain, Database, Infinity as InfinityIcon, Lock, Radio, ShieldCheck } from "lucide-react";
-import { Mement0Mark } from "@/components/mement0-logo";
+import { Mement0Logo } from "@/components/mement0-logo";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -26,9 +26,7 @@ function About() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/60 backdrop-blur sticky top-0 z-30 bg-background/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link to="/" className="flex items-center gap-2">
-            <Mement0Mark className="text-xl" />
-          </Link>
+          <Mement0Logo to="/" />
           <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
             <a href="#promise" className="hover:text-foreground transition-colors">The promise</a>
             <a href="#architecture" className="hover:text-foreground transition-colors">Architecture</a>
@@ -181,7 +179,7 @@ function About() {
 
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-8 flex items-center justify-between text-xs text-muted-foreground">
-          <Mement0Mark />
+          <Mement0Logo to="/" />
           <span>© Mement0 — the eternal archive.</span>
         </div>
       </footer>
