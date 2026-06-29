@@ -70,7 +70,7 @@ export function Mement0Logo({
         className="text-lg font-semibold tracking-tight text-foreground"
         style={bodoni}
       >
-        Ment&Oslash;
+        Mement&Oslash;
       </span>
     </Link>
   );
