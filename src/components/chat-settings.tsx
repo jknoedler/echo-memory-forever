@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Settings as SettingsIcon, Sun, Moon, Monitor, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme, type ThemeMode } from "@/lib/theme";
+import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
