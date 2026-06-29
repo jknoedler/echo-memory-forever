@@ -70,23 +70,36 @@ export const setActiveProvider = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       provider_id: z.string().uuid().nullable(),
+      provider_kind: z.enum(["lovable", "openai", "custom"]).optional(),
       model: z.string().max(200).optional(),
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    const providerName =
+      data.provider_id !== null
+        ? "custom"
+        : (data.provider_kind ?? "lovable");
     const update: {
       active_provider_id: string | null;
       provider: string;
       model?: string;
     } = {
       active_provider_id: data.provider_id,
-      provider: data.provider_id === null ? "lovable" : "custom",
+      provider: providerName,
     };
-    if (data.provider_id !== null && data.model) update.model = data.model;
+    if (data.model) update.model = data.model;
     const { error } = await context.supabase
       .from("user_settings")
       .update(update)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
+  });
+
+export const listEnvProviders = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async () => {
+    return {
+      openai: !!process.env.OPENAI_API_KEY,
+    };
   });
