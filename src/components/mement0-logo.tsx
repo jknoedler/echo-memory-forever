@@ -95,7 +95,7 @@ export function Mement0Hero({ className = "" }: { className?: string }) {
           letterSpacing: "-0.02em",
         }}
       >
-        Ment<span style={{ fontWeight: 400 }}>&Oslash;</span>
+        Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
       </div>
       <div
         className="mt-3 text-foreground"
