@@ -86,6 +86,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ul className="space-y-0.5">
               {threadsQ.data!.map((t) => {
                 const active = t.id === activeId;
+                const idleHrs = (Date.now() - new Date(t.last_message_at).getTime()) / 3_600_000;
+                const stale = t.continuity_status === "open" && idleHrs > 12;
                 return (
                   <li key={t.id} className="group flex items-center">
                     <Link
@@ -97,7 +99,15 @@ export function AppShell({ children }: { children: ReactNode }) {
                           : "text-sidebar-foreground hover:bg-sidebar-accent/60"
                       }`}
                     >
-                      <span className="block truncate">{t.title}</span>
+                      <span className="flex items-center gap-2 min-w-0">
+                        {stale && (
+                          <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse"
+                            title="Unresolved — check-in pending"
+                          />
+                        )}
+                        <span className="block truncate">{t.title}</span>
+                      </span>
                     </Link>
                     <button
                       type="button"
