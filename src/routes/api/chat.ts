@@ -194,6 +194,9 @@ export const Route = createFileRoute("/api/chat")({
           "",
           "### STAGED TASKS PENDING APPROVAL",
           pendingBlock || "(none)",
+          "",
+          "### CONTINUITY",
+          continuityBlock,
         ].join("\n");
 
         // Resolve provider
