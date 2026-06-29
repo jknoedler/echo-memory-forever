@@ -2,10 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { SendHorizonal, Loader2 } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { SendHorizonal, Loader2, CheckCircle2, CircleDot } from "lucide-react";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getThreadMessages } from "@/lib/threads.functions";
+import { listThreads, setThreadContinuity } from "@/lib/threads.functions";
 
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
   component: ChatPage,
