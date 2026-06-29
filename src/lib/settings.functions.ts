@@ -8,7 +8,7 @@ export const getMySettings = createServerFn({ method: "GET" })
     const { data, error } = await context.supabase
       .from("user_settings")
       .select(
-        "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret",
+        "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret, active_provider_id",
       )
       .eq("user_id", context.userId)
       .maybeSingle();
@@ -19,7 +19,7 @@ export const getMySettings = createServerFn({ method: "GET" })
         .from("user_settings")
         .insert({ user_id: context.userId })
         .select(
-          "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret",
+          "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret, active_provider_id",
         )
         .single();
       if (insErr) throw new Error(insErr.message);
