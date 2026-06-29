@@ -101,6 +101,46 @@ export function ChatSettings({
 
           <div className="my-3 h-px bg-border" />
 
+          <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+            Background
+          </p>
+          <div className="grid grid-cols-8 gap-1.5 px-1">
+            {BG_PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setBgPalette(p.id)}
+                title={p.label}
+                aria-label={`Background ${p.label}`}
+                className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
+                  bgPalette === p.id ? "border-primary ring-2 ring-primary/40" : "border-border"
+                }`}
+                style={{ background: p.swatch }}
+              />
+            ))}
+          </div>
+
+          <p className="mt-3 px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+            Accent
+          </p>
+          <div className="grid grid-cols-8 gap-1.5 px-1">
+            {ACCENT_PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setAccentPalette(p.id)}
+                title={p.label}
+                aria-label={`Accent ${p.label}`}
+                className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
+                  accentPalette === p.id ? "border-foreground ring-2 ring-foreground/40" : "border-border"
+                }`}
+                style={{ background: p.swatch }}
+              />
+            ))}
+          </div>
+
+          <div className="my-3 h-px bg-border" />
+
           <label className="flex items-start gap-2 cursor-pointer px-1 py-1">
             <input
               type="checkbox"
