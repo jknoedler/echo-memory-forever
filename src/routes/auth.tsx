@@ -150,14 +150,24 @@ function AuthPage() {
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={busy}
-            className="w-full rounded-md border border-border bg-background py-3 font-medium hover:bg-secondary transition-colors disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => handleOAuth("google")}
+              disabled={busy}
+              className="w-full rounded-md border border-border bg-background py-3 font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOAuth("apple")}
+              disabled={busy}
+              className="w-full rounded-md border border-border bg-background py-3 font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              Continue with Apple
+            </button>
+          </div>
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
