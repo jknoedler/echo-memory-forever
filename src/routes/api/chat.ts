@@ -17,6 +17,12 @@ import { createClient } from "@supabase/supabase-js";
 import { resolveProvider } from "@/lib/ai-provider.server";
 import { DED_PERSONA } from "@/lib/persona";
 import { embedText } from "@/lib/embeddings.server";
+import {
+  buildPersonalityBlock,
+  captureDirective,
+  sweepRecalibrations,
+  updateStyleFingerprint,
+} from "@/lib/personality.server";
 import type { Database } from "@/integrations/supabase/types";
 
 function isNewKey(v: string) {
