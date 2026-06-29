@@ -37,6 +37,7 @@ export function resolveProvider(
   opts: {
     lovableApiKey?: string;
     openaiApiKey?: string;
+    groqApiKey?: string;
     initialRunId?: string;
     activeProvider?: ActiveProvider | null;
   } = {},
@@ -72,6 +73,19 @@ export function resolveProvider(
       headers: { Authorization: `Bearer ${opts.openaiApiKey}` },
     });
     return { model: provider(modelId), providerName: "openai", modelId };
+  }
+
+  if (cfg.provider === "groq") {
+    if (!opts.groqApiKey) {
+      throw new Error("Groq provider selected but GROQ_API_KEY is not configured.");
+    }
+    const modelId = cfg.model || "llama-3.3-70b-versatile";
+    const provider = createOpenAICompatible({
+      name: "groq",
+      baseURL: "https://api.groq.com/openai/v1",
+      headers: { Authorization: `Bearer ${opts.groqApiKey}` },
+    });
+    return { model: provider(modelId), providerName: "groq", modelId };
   }
 
   if (cfg.provider === "custom") {
