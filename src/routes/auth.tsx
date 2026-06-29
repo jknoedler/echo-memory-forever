@@ -51,24 +51,25 @@ function AuthPage() {
     }
   }
 
-  async function handleGoogle() {
+  async function handleOAuth(provider: "google" | "apple") {
     setBusy(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin + "/auth",
+      const result = await lovable.auth.signInWithOAuth(provider, {
+        redirect_uri: window.location.origin,
       });
       if (result.error) {
-        toast.error(result.error.message || "Google sign-in failed");
+        toast.error(result.error.message || `${provider} sign-in failed`);
         setBusy(false);
         return;
       }
       if (result.redirected) return;
       navigate({ to: "/app" });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Google sign-in failed");
+      toast.error(err instanceof Error ? err.message : `${provider} sign-in failed`);
       setBusy(false);
     }
   }
+
 
   return (
     <div className="min-h-screen flex items-center justify-center px-5">
@@ -149,14 +150,24 @@ function AuthPage() {
             <div className="h-px flex-1 bg-border" />
           </div>
 
-          <button
-            type="button"
-            onClick={handleGoogle}
-            disabled={busy}
-            className="w-full rounded-md border border-border bg-background py-3 font-medium hover:bg-secondary transition-colors disabled:opacity-50"
-          >
-            Continue with Google
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => handleOAuth("google")}
+              disabled={busy}
+              className="w-full rounded-md border border-border bg-background py-3 font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              Continue with Google
+            </button>
+            <button
+              type="button"
+              onClick={() => handleOAuth("apple")}
+              disabled={busy}
+              className="w-full rounded-md border border-border bg-background py-3 font-medium hover:bg-secondary transition-colors disabled:opacity-50"
+            >
+              Continue with Apple
+            </button>
+          </div>
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
