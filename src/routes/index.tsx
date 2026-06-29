@@ -55,11 +55,9 @@ function Landing() {
             <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
             v0 — lifelong AI memory, now boot-strapping
           </div>
-          <h1 className="mt-7 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95]">
-            <Mement0Mark />
-          </h1>
-          <p className="mt-6 text-3xl md:text-4xl font-display tracking-wide ember-text">MORE</p>
-          <p className="mt-2 text-xl md:text-2xl text-muted-foreground tracking-widest">0&nbsp;LOSS</p>
+          <p className="mt-7 text-sm uppercase tracking-[0.3em] text-muted-foreground">Mement0</p>
+          <h1 className="mt-6 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95] ember-text">MORE</h1>
+          <p className="mt-2 text-xl md:text-2xl text-muted-foreground tracking-widest">0&nbsp;loss</p>
 
           <p className="mx-auto mt-10 max-w-2xl text-lg text-muted-foreground leading-relaxed">
             A lifelong, model-agnostic AI that remembers every thread of your life. Begin as a
