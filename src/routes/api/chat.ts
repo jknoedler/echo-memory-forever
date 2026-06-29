@@ -389,7 +389,11 @@ export const Route = createFileRoute("/api/chat")({
             writer.merge(primary.toUIMessageStream({ sendStart: true, sendFinish: true }));
             // Wait until the primary stream is fully done before deciding
             // whether to fire the fallback.
-            await primary.consumeStream().catch(() => {});
+            try {
+              await primary.consumeStream();
+            } catch {
+              /* primary stream errors surface to the client via the stream itself */
+            }
 
             await persistAssistant(primaryText, { tier: "primary" });
 
