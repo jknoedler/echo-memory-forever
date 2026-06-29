@@ -129,23 +129,31 @@ export function ChatSettings({
                 <select
                   className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
                   value={
-                    settingsQ.data?.fallback_provider_kind === "groq"
-                      ? "env:groq"
-                      : settingsQ.data?.fallback_provider_kind === "openai"
-                        ? "env:openai"
-                        : settingsQ.data?.fallback_provider_kind === "llama"
-                          ? "env:llama"
-                          : settingsQ.data?.fallback_provider_id ?? ""
+                    settingsQ.data?.fallback_provider_kind === "venice"
+                      ? "env:venice"
+                      : settingsQ.data?.fallback_provider_kind === "groq"
+                        ? "env:groq"
+                        : settingsQ.data?.fallback_provider_kind === "openai"
+                          ? "env:openai"
+                          : settingsQ.data?.fallback_provider_kind === "llama"
+                            ? "env:llama"
+                            : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
+                    if (v === "env:venice") fallbackM.mutate({ id: null, kind: "venice" });
+                    else if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
                     else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
                     else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
-                  <option value="">Off</option>
+                  <option value="">
+                    {envQ.data?.venice ? "Auto (Venice — default)" : "Off"}
+                  </option>
+                  {envQ.data?.venice && (
+                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
+                  )}
                   {envQ.data?.llama && (
                     <option value="env:llama">Llama (project key) · Llama 3.3 70B</option>
                   )}
@@ -165,6 +173,7 @@ export function ChatSettings({
                     );
                   })}
                 </select>
+
               </div>
             </>
           )}
