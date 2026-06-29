@@ -269,6 +269,7 @@ export const Route = createFileRoute("/api/chat")({
             lovableApiKey: process.env.LOVABLE_API_KEY,
             openaiApiKey: process.env.OPENAI_API_KEY,
             groqApiKey: process.env.GROQ_API_KEY,
+            llamaApiKey: process.env.LLAMA_API_KEY,
             activeProvider,
           });
           primaryModel = resolved.model;
@@ -284,12 +285,19 @@ export const Route = createFileRoute("/api/chat")({
         let fallbackLabel: string | null = null;
         if (fallbackEnvKind) {
           try {
+            const fbModelId =
+              fallbackEnvKind === "groq"
+                ? "llama-3.3-70b-versatile"
+                : fallbackEnvKind === "llama"
+                  ? "Llama-3.3-70B-Instruct"
+                  : "gpt-4o-mini";
             const resolvedFb = resolveProvider(
-              { ...cfg, provider: fallbackEnvKind, model: fallbackEnvKind === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o-mini" },
+              { ...cfg, provider: fallbackEnvKind, model: fbModelId },
               {
                 lovableApiKey: process.env.LOVABLE_API_KEY,
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
+                llamaApiKey: process.env.LLAMA_API_KEY,
                 activeProvider: null,
               },
             );
@@ -306,6 +314,7 @@ export const Route = createFileRoute("/api/chat")({
                 lovableApiKey: process.env.LOVABLE_API_KEY,
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
+                llamaApiKey: process.env.LLAMA_API_KEY,
                 activeProvider: fallbackProvider,
               },
             );
