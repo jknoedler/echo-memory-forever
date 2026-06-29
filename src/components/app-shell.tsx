@@ -1,11 +1,15 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Brain, ChevronLeft, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo } from "@/components/mement0-logo";
 import { supabase } from "@/integrations/supabase/client";
 import { createThread, deleteThread, listThreads } from "@/lib/threads.functions";
+
+const SIDEBAR_KEY = "mement0_sidebar_collapsed";
+const VISIBLE_THREADS = 10;
+
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
