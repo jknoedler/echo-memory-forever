@@ -425,7 +425,11 @@ export const Route = createFileRoute("/api/chat")({
                 },
               });
               writer.merge(fb.toUIMessageStream({ sendStart: true, sendFinish: true }));
-              await fb.consumeStream().catch(() => {});
+              try {
+                await fb.consumeStream();
+              } catch {
+                /* fallback stream errors surface through the stream */
+              }
             } catch (err) {
               const msg = `${FALLBACK_PREAMBLE}\n\n[fallback error: ${
                 err instanceof Error ? err.message : String(err)
