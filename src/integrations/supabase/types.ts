@@ -372,6 +372,7 @@ export type Database = {
           custom_api_key: string | null
           custom_base_url: string | null
           custom_model_id: string | null
+          fallback_provider_id: string | null
           hotl_auto_execute: boolean
           model: string
           provider: string
@@ -386,6 +387,7 @@ export type Database = {
           custom_api_key?: string | null
           custom_base_url?: string | null
           custom_model_id?: string | null
+          fallback_provider_id?: string | null
           hotl_auto_execute?: boolean
           model?: string
           provider?: string
@@ -400,6 +402,7 @@ export type Database = {
           custom_api_key?: string | null
           custom_base_url?: string | null
           custom_model_id?: string | null
+          fallback_provider_id?: string | null
           hotl_auto_execute?: boolean
           model?: string
           provider?: string
@@ -411,6 +414,13 @@ export type Database = {
           {
             foreignKeyName: "user_settings_active_provider_id_fkey"
             columns: ["active_provider_id"]
+            isOneToOne: false
+            referencedRelation: "user_providers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_settings_fallback_provider_id_fkey"
+            columns: ["fallback_provider_id"]
             isOneToOne: false
             referencedRelation: "user_providers"
             referencedColumns: ["id"]
