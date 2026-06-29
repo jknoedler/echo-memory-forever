@@ -17,6 +17,12 @@ import { createClient } from "@supabase/supabase-js";
 import { resolveProvider } from "@/lib/ai-provider.server";
 import { DED_PERSONA } from "@/lib/persona";
 import { embedText } from "@/lib/embeddings.server";
+import {
+  buildPersonalityBlock,
+  captureDirective,
+  sweepRecalibrations,
+  updateStyleFingerprint,
+} from "@/lib/personality.server";
 import type { Database } from "@/integrations/supabase/types";
 
 function isNewKey(v: string) {
@@ -200,8 +206,11 @@ export const Route = createFileRoute("/api/chat")({
           : `STALE_OPEN=false. status=${contThread?.continuity_status ?? "open"}.`;
 
         const baseSystem = settings?.system_prompt_override?.trim() || DED_PERSONA;
+        const personalityBlock = await buildPersonalityBlock(supabase, userId);
         const system = [
           baseSystem,
+          "",
+          personalityBlock,
           "",
           "### RETRIEVED MEMORY CONTEXT",
           memoryBlock || "(no relevant memories retrieved)",
@@ -254,6 +263,21 @@ export const Route = createFileRoute("/api/chat")({
               metadata: { role: "user" },
             });
           }).catch(() => {});
+
+          // Adaptive personality: capture directives + update mannerism
+          // fingerprint + sweep ripe recalibrations. Fire-and-forget so we
+          // don't block the stream.
+          (async () => {
+            try {
+              await Promise.all([
+                captureDirective(supabase, userId, threadId, userText),
+                updateStyleFingerprint(supabase, userId, userText),
+                sweepRecalibrations(supabase, userId),
+              ]);
+            } catch {
+              /* personality capture is best-effort */
+            }
+          })();
 
           // Bump thread title from first user message if still default
           if (thread.title === "New conversation") {

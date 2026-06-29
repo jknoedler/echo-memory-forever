@@ -120,6 +120,104 @@ export type Database = {
           },
         ]
       }
+      personality_rules: {
+        Row: {
+          created_at: string
+          directive: string
+          emotion_score: number
+          id: string
+          polarity: string
+          reason: string | null
+          recalibrate_after: string | null
+          source_message: string | null
+          status: string
+          thread_id: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          directive: string
+          emotion_score?: number
+          id?: string
+          polarity: string
+          reason?: string | null
+          recalibrate_after?: string | null
+          source_message?: string | null
+          status?: string
+          thread_id?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          directive?: string
+          emotion_score?: number
+          id?: string
+          polarity?: string
+          reason?: string | null
+          recalibrate_after?: string | null
+          source_message?: string | null
+          status?: string
+          thread_id?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personality_rules_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personality_style: {
+        Row: {
+          avg_message_length: number
+          caps_rate: number
+          contraction_rate: number
+          created_at: string
+          emoji_rate: number
+          exclamation_rate: number
+          profanity_rate: number
+          question_rate: number
+          sample_count: number
+          traits: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avg_message_length?: number
+          caps_rate?: number
+          contraction_rate?: number
+          created_at?: string
+          emoji_rate?: number
+          exclamation_rate?: number
+          profanity_rate?: number
+          question_rate?: number
+          sample_count?: number
+          traits?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avg_message_length?: number
+          caps_rate?: number
+          contraction_rate?: number
+          created_at?: string
+          emoji_rate?: number
+          exclamation_rate?: number
+          profanity_rate?: number
+          question_rate?: number
+          sample_count?: number
+          traits?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
