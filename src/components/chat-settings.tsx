@@ -132,16 +132,22 @@ export function ChatSettings({
                       ? "env:groq"
                       : settingsQ.data?.fallback_provider_kind === "openai"
                         ? "env:openai"
-                        : settingsQ.data?.fallback_provider_id ?? ""
+                        : settingsQ.data?.fallback_provider_kind === "llama"
+                          ? "env:llama"
+                          : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
                     else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
+                    else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
                   <option value="">Off</option>
+                  {envQ.data?.llama && (
+                    <option value="env:llama">Llama (project key) · Llama 3.3 70B</option>
+                  )}
                   {envQ.data?.groq && (
                     <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
                   )}
