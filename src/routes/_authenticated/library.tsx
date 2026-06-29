@@ -22,11 +22,25 @@ export const Route = createFileRoute("/_authenticated/library")({
 
 function LibraryPage() {
   const qc = useQueryClient();
+  const { focus } = Route.useSearch();
+  const cardRefs = useRef<Map<string, HTMLDivElement | null>>(new Map());
+  const [pulse, setPulse] = useState<string | null>(null);
+
   const providersQ = useQuery({
     queryKey: ["user_providers"],
     queryFn: () => listUserProviders(),
   });
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
+
+  useEffect(() => {
+    if (!focus) return;
+    const node = cardRefs.current.get(focus);
+    if (!node) return;
+    node.scrollIntoView({ behavior: "smooth", block: "center" });
+    setPulse(focus);
+    const t = setTimeout(() => setPulse(null), 2400);
+    return () => clearTimeout(t);
+  }, [focus, providersQ.isLoading]);
 
   const addedByCatalog = useMemo(() => {
     const m = new Map<string, { id: string; default_model: string | null; has_key: boolean }>();
