@@ -13,6 +13,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiSttRouteImport } from './routes/api/stt'
 import { Route as ApiChatRouteImport } from './routes/api/chat'
 import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/tasks'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -39,6 +40,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiSttRoute = ApiSttRouteImport.update({
+  id: '/api/stt',
+  path: '/api/stt',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiChatRoute = ApiChatRouteImport.update({
@@ -93,6 +99,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/stt': typeof ApiSttRoute
   '/c/$threadId': typeof AuthenticatedCThreadIdRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/tasks': typeof AuthenticatedTasksRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/stt': typeof ApiSttRoute
   '/c/$threadId': typeof AuthenticatedCThreadIdRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/tasks': typeof AuthenticatedTasksRoute
   '/api/chat': typeof ApiChatRoute
+  '/api/stt': typeof ApiSttRoute
   '/_authenticated/c/$threadId': typeof AuthenticatedCThreadIdRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
@@ -136,6 +145,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/api/chat'
+    | '/api/stt'
     | '/c/$threadId'
     | '/api/public/biometrics'
   fileRoutesByTo: FileRoutesByTo
@@ -149,6 +159,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/tasks'
     | '/api/chat'
+    | '/api/stt'
     | '/c/$threadId'
     | '/api/public/biometrics'
   id:
@@ -163,6 +174,7 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/tasks'
     | '/api/chat'
+    | '/api/stt'
     | '/_authenticated/c/$threadId'
     | '/api/public/biometrics'
   fileRoutesById: FileRoutesById
@@ -173,6 +185,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
   ApiChatRoute: typeof ApiChatRoute
+  ApiSttRoute: typeof ApiSttRoute
   ApiPublicBiometricsRoute: typeof ApiPublicBiometricsRoute
 }
 
@@ -204,6 +217,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/stt': {
+      id: '/api/stt'
+      path: '/api/stt'
+      fullPath: '/api/stt'
+      preLoaderRoute: typeof ApiSttRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/chat': {
@@ -292,6 +312,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
   ApiChatRoute: ApiChatRoute,
+  ApiSttRoute: ApiSttRoute,
   ApiPublicBiometricsRoute: ApiPublicBiometricsRoute,
 }
 export const routeTree = rootRouteImport
