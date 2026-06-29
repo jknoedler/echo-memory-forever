@@ -373,6 +373,7 @@ export type Database = {
           custom_base_url: string | null
           custom_model_id: string | null
           fallback_provider_id: string | null
+          fallback_provider_kind: string | null
           hotl_auto_execute: boolean
           model: string
           provider: string
@@ -388,6 +389,7 @@ export type Database = {
           custom_base_url?: string | null
           custom_model_id?: string | null
           fallback_provider_id?: string | null
+          fallback_provider_kind?: string | null
           hotl_auto_execute?: boolean
           model?: string
           provider?: string
@@ -403,6 +405,7 @@ export type Database = {
           custom_base_url?: string | null
           custom_model_id?: string | null
           fallback_provider_id?: string | null
+          fallback_provider_kind?: string | null
           hotl_auto_execute?: boolean
           model?: string
           provider?: string

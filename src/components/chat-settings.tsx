@@ -36,9 +36,13 @@ export function ChatSettings({
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
 
+  const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
+
   const fallbackM = useMutation({
-    mutationFn: (id: string | null) =>
-      updateMySettings({ data: { fallback_provider_id: id } }),
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | null }) =>
+      updateMySettings({
+        data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
+      }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
       toast.success("Fallback updated");
@@ -119,16 +123,31 @@ export function ChatSettings({
                 </p>
                 <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
                   If the primary model refuses or can't answer, auto-retry the
-                  same turn on this provider. Uses your library key.
+                  same turn on this provider.
                 </p>
                 <select
                   className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-                  value={settingsQ.data?.fallback_provider_id ?? ""}
-                  onChange={(e) =>
-                    fallbackM.mutate(e.target.value || null)
+                  value={
+                    settingsQ.data?.fallback_provider_kind === "groq"
+                      ? "env:groq"
+                      : settingsQ.data?.fallback_provider_kind === "openai"
+                        ? "env:openai"
+                        : settingsQ.data?.fallback_provider_id ?? ""
                   }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
+                    else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
+                    else fallbackM.mutate({ id: v || null, kind: null });
+                  }}
                 >
                   <option value="">Off</option>
+                  {envQ.data?.groq && (
+                    <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
+                  )}
+                  {envQ.data?.openai && (
+                    <option value="env:openai">OpenAI (project key) · gpt-4o-mini</option>
+                  )}
                   {(providersQ.data ?? []).map((p) => {
                     const cat = findCatalog(p.catalog_id);
                     return (
@@ -139,18 +158,6 @@ export function ChatSettings({
                     );
                   })}
                 </select>
-                {(providersQ.data ?? []).length === 0 && (
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
-                    Add a provider in{" "}
-                    <a
-                      href="/library"
-                      className="underline hover:text-foreground"
-                    >
-                      /library
-                    </a>{" "}
-                    first.
-                  </p>
-                )}
               </div>
             </>
           )}
@@ -171,7 +178,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -191,13 +198,16 @@ export function ModelPicker() {
   const activeId = settingsQ.data?.active_provider_id ?? null;
   const providerKind = settingsQ.data?.provider ?? "lovable";
   const envOpenAiActive = !activeId && providerKind === "openai";
+  const envGroqActive = !activeId && providerKind === "groq";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
     ? `${activeCat?.name ?? "Custom"} · ${settingsQ.data?.model || activeProvider?.default_model || "—"}`
     : envOpenAiActive
       ? `OpenAI · ${settingsQ.data?.model || "gpt-4o-mini"}`
-      : "Auto (recommended)";
+      : envGroqActive
+        ? `Groq · ${settingsQ.data?.model || "llama-3.3-70b-versatile"}`
+        : "Auto (recommended)";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
@@ -214,6 +224,15 @@ export function ModelPicker() {
       provider_id: null,
       provider_kind: "openai",
       model: cat?.models[0] ?? "gpt-4o-mini",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvGroq() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "groq",
+      model: "llama-3.3-70b-versatile",
     });
     setOpen(false);
   }
@@ -259,8 +278,31 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.groq && !connectedByCat.get("groq") && (
+            <button
+              type="button"
+              onClick={pickEnvGroq}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envGroqActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Groq (project key)</span>
+                <span className="block text-[10px] truncate">
+                  llama-3.3-70b-versatile · uses GROQ_API_KEY
+                </span>
+              </span>
+              {envGroqActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           {envQ.data?.openai && !connectedByCat.get("openai") && (
             <button
               type="button"

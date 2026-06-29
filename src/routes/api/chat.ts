@@ -126,7 +126,7 @@ export const Route = createFileRoute("/api/chat")({
         const { data: settings } = await supabase
           .from("user_settings")
           .select(
-            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id",
+            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id, fallback_provider_kind",
           )
           .eq("user_id", userId)
           .maybeSingle();
@@ -155,14 +155,20 @@ export const Route = createFileRoute("/api/chat")({
           if (ap) activeProvider = ap;
         }
 
-        // Capability-fallback provider — used when primary refuses.
+        // Capability-fallback provider — used when primary refuses. Can be
+        // either a saved library row OR an env-key built-in (groq/openai).
         let fallbackProvider = null as null | {
           catalog_id: string;
           base_url: string | null;
           api_key: string | null;
           default_model: string | null;
         };
-        if (
+        let fallbackEnvKind: "groq" | "openai" | null = null;
+        if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
+          fallbackEnvKind = "groq";
+        } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
+          fallbackEnvKind = "openai";
+        } else if (
           settings?.fallback_provider_id &&
           settings.fallback_provider_id !== settings.active_provider_id
         ) {
@@ -260,6 +266,7 @@ export const Route = createFileRoute("/api/chat")({
           const resolved = resolveProvider(cfg, {
             lovableApiKey: process.env.LOVABLE_API_KEY,
             openaiApiKey: process.env.OPENAI_API_KEY,
+            groqApiKey: process.env.GROQ_API_KEY,
             activeProvider,
           });
           primaryModel = resolved.model;
@@ -272,17 +279,36 @@ export const Route = createFileRoute("/api/chat")({
 
         // Resolve fallback provider (best-effort — never blocks primary).
         let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
-        if (fallbackProvider) {
+        let fallbackLabel: string | null = null;
+        if (fallbackEnvKind) {
+          try {
+            const resolvedFb = resolveProvider(
+              { ...cfg, provider: fallbackEnvKind, model: fallbackEnvKind === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o-mini" },
+              {
+                lovableApiKey: process.env.LOVABLE_API_KEY,
+                openaiApiKey: process.env.OPENAI_API_KEY,
+                groqApiKey: process.env.GROQ_API_KEY,
+                activeProvider: null,
+              },
+            );
+            fallbackModel = resolvedFb.model;
+            fallbackLabel = fallbackEnvKind;
+          } catch {
+            fallbackModel = null;
+          }
+        } else if (fallbackProvider) {
           try {
             const resolvedFb = resolveProvider(
               { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
               {
                 lovableApiKey: process.env.LOVABLE_API_KEY,
                 openaiApiKey: process.env.OPENAI_API_KEY,
+                groqApiKey: process.env.GROQ_API_KEY,
                 activeProvider: fallbackProvider,
               },
             );
             fallbackModel = resolvedFb.model;
+            fallbackLabel = fallbackProvider.catalog_id;
           } catch {
             fallbackModel = null;
           }
@@ -444,7 +470,7 @@ export const Route = createFileRoute("/api/chat")({
               : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
             await persistAssistant(persistedFb, {
               tier: "fallback",
-              fallback_catalog: fallbackProvider?.catalog_id ?? null,
+              fallback_catalog: fallbackLabel,
             });
 
             try {
