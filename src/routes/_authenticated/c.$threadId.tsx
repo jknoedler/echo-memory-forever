@@ -96,11 +96,27 @@ function ChatWindow({
 
   const isBusy = status === "submitted" || status === "streaming";
 
+  const qc = useQueryClient();
+  const threadsQ = useQuery({ queryKey: ["threads"], queryFn: () => listThreads() });
+  const thisThread = threadsQ.data?.find((t) => t.id === threadId);
+  const continuity = thisThread?.continuity_status ?? "open";
+  const setStatus = useMutation({
+    mutationFn: (status: "open" | "resolved") =>
+      setThreadContinuity({ data: { id: threadId, status } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["threads"] });
+      toast.success("Continuity updated");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
     const text = input.trim();
     if (!text || isBusy) return;
     setInput("");
+    // Any new user message reopens the thread.
+    if (continuity === "resolved") setStatus.mutate("open");
     try {
       await sendMessage({ text });
     } finally {
@@ -110,6 +126,31 @@ function ChatWindow({
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
+      <div className="flex items-center justify-between border-b border-border px-4 py-2 text-xs">
+        <span className="truncate text-muted-foreground">{thisThread?.title ?? ""}</span>
+        <button
+          type="button"
+          onClick={() =>
+            setStatus.mutate(continuity === "resolved" ? "open" : "resolved")
+          }
+          disabled={setStatus.isPending}
+          className={`inline-flex items-center gap-1.5 rounded-md border px-2 py-1 transition-colors ${
+            continuity === "resolved"
+              ? "border-border text-muted-foreground hover:text-foreground"
+              : "border-primary/40 text-primary hover:bg-primary/10"
+          }`}
+        >
+          {continuity === "resolved" ? (
+            <>
+              <CheckCircle2 className="h-3.5 w-3.5" /> Resolved
+            </>
+          ) : (
+            <>
+              <CircleDot className="h-3.5 w-3.5" /> Open — mark resolved
+            </>
+          )}
+        </button>
+      </div>
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
           {messages.length === 0 && (
