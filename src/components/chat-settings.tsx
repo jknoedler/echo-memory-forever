@@ -270,6 +270,16 @@ export function ModelPicker() {
     setOpen(false);
   }
 
+  function pickEnvVenice() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "venice",
+      model: "venice-uncensored",
+    });
+    setOpen(false);
+  }
+
+
   function pickCatalog(catId: string) {
     const connected = connectedByCat.get(catId);
     if (connected) {
