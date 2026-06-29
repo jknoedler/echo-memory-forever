@@ -103,8 +103,9 @@ function About() {
                   body="pgvector + text-embedding-3-small. Every message embedded and retrieved by semantic similarity." />
             <Tile icon={<Radio className="h-4 w-4" />} title="Biometric Ingest"
                   body="Signed POST endpoint accepts wearable telemetry — HR, sleep, HRV, typing rhythm." />
-            <Tile icon={<Brain className="h-4 w-4" />} title="System of Josiah"
-                  body="The hardened persona contract every model adopts. Direct. Strategic. No fluff." />
+            <Tile icon={<Brain className="h-4 w-4" />} title="DED"
+                  body="Dead Entertainment Dataset — the hardened persona contract every model adopts. Direct. Strategic. No fluff." />
+
             <Tile icon={<Lock className="h-4 w-4" />} title="HOTL Commitment Engine"
                   body="Drafts and stages high-stakes actions. You approve before anything ships." />
           </div>
