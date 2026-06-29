@@ -8,6 +8,12 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { getThreadMessages } from "@/lib/threads.functions";
 import { listThreads, setThreadContinuity } from "@/lib/threads.functions";
+import {
+  AttachmentsButton,
+  AttachmentChips,
+  type Attachment,
+} from "@/components/chat-attachments";
+import { ChatSettings, ModelPicker, useAdvanced } from "@/components/chat-settings";
 
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
   component: ChatPage,
@@ -19,11 +25,7 @@ function dbToUI(m: DBMsg): UIMessage {
   const parts = Array.isArray(m.parts)
     ? (m.parts as UIMessage["parts"])
     : [{ type: "text" as const, text: m.content }];
-  return {
-    id: m.id,
-    role: (m.role as UIMessage["role"]) ?? "user",
-    parts,
-  };
+  return { id: m.id, role: (m.role as UIMessage["role"]) ?? "user", parts };
 }
 
 function ChatPage() {
@@ -83,14 +85,15 @@ function ChatWindow({
   });
 
   const [input, setInput] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [advanced, setAdvanced] = useAdvanced();
 
   useEffect(() => {
     inputRef.current?.focus();
   }, [threadId]);
 
-  // Auto-send a prompt stashed from the landing page
   const consumedRef = useRef(false);
   useEffect(() => {
     if (consumedRef.current) return;
@@ -102,9 +105,6 @@ function ChatWindow({
     }
   }, [sendMessage]);
 
-  // Only scroll when a new message is appended (e.g., user sends), not on
-  // every streaming token. This lets the user read from the top while the
-  // assistant types without the view chasing the bottom.
   const lastCountRef = useRef(0);
   useEffect(() => {
     if (messages.length > lastCountRef.current) {
@@ -129,15 +129,58 @@ function ChatWindow({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
+  function addFiles(files: File[]) {
+    const next: Attachment[] = files.map((f) => ({
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      name: f.name || (f.type.startsWith("image/") ? "pasted-image" : "file"),
+      type: f.type || "application/octet-stream",
+      size: f.size,
+      previewUrl: f.type.startsWith("image/") ? URL.createObjectURL(f) : undefined,
+    }));
+    setAttachments((p) => [...p, ...next]);
+  }
+
+  function removeAttachment(id: string) {
+    setAttachments((p) => {
+      const out = p.filter((a) => a.id !== id);
+      const removed = p.find((a) => a.id === id);
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
+      return out;
+    });
+  }
+
+  function onPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files: File[] = [];
+    for (const it of items) {
+      if (it.kind === "file") {
+        const f = it.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length) {
+      e.preventDefault();
+      addFiles(files);
+    }
+  }
+
   async function submit(e?: React.FormEvent) {
     e?.preventDefault();
     const text = input.trim();
-    if (!text || isBusy) return;
+    if ((!text && attachments.length === 0) || isBusy) return;
+    const composed =
+      attachments.length > 0
+        ? `[attachments: ${attachments.map((a) => a.name).join(", ")}]${text ? "\n\n" + text : ""}`
+        : text;
     setInput("");
-    // Any new user message reopens the thread.
+    setAttachments((p) => {
+      p.forEach((a) => a.previewUrl && URL.revokeObjectURL(a.previewUrl));
+      return [];
+    });
     if (continuity === "resolved") setStatus.mutate("open");
     try {
-      await sendMessage({ text });
+      await sendMessage({ text: composed });
     } finally {
       setTimeout(() => inputRef.current?.focus(), 0);
     }
@@ -145,8 +188,10 @@ function ChatWindow({
 
   return (
     <div className="flex flex-1 flex-col min-h-0">
-      <div className="flex items-center justify-between border-b border-border px-4 py-2 text-xs">
-        <span className="truncate text-muted-foreground">{thisThread?.title ?? ""}</span>
+      <div className="flex items-center justify-between border-b border-border px-4 py-2 text-xs gap-2">
+        <span className="truncate text-muted-foreground min-w-0 flex-1">
+          {thisThread?.title ?? ""}
+        </span>
         <button
           type="button"
           onClick={() =>
@@ -165,11 +210,13 @@ function ChatWindow({
             </>
           ) : (
             <>
-              <CircleDot className="h-3.5 w-3.5" /> Open — mark resolved
+              <CircleDot className="h-3.5 w-3.5" /> Open
             </>
           )}
         </button>
+        <ChatSettings advanced={advanced} setAdvanced={setAdvanced} />
       </div>
+
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
           {messages.length === 0 && (
@@ -195,38 +242,43 @@ function ChatWindow({
         </div>
       </div>
 
-      <form
-        onSubmit={submit}
-        className="border-t border-border bg-card/40 px-4 py-3"
-      >
-        <div className="mx-auto max-w-3xl flex items-end gap-2">
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                submit();
-              }
-            }}
-            placeholder="Speak. The archive is listening."
-            rows={1}
-            className="flex-1 resize-none rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
-            style={{ maxHeight: 240 }}
-          />
-          <button
-            type="submit"
-            disabled={isBusy || !input.trim()}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
-            aria-label="Send"
-          >
-            {isBusy ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <SendHorizonal className="h-4 w-4" />
-            )}
-          </button>
+      <form onSubmit={submit} className="border-t border-border bg-card/40 px-4 py-3">
+        <div className="mx-auto max-w-3xl">
+          <AttachmentChips items={attachments} onRemove={removeAttachment} />
+          <div className="flex items-end gap-2">
+            <textarea
+              ref={inputRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onPaste={onPaste}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  submit();
+                }
+              }}
+              placeholder="Speak. The archive is listening."
+              rows={1}
+              className="flex-1 resize-none rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary"
+              style={{ maxHeight: 240 }}
+            />
+            <button
+              type="submit"
+              disabled={isBusy || (!input.trim() && attachments.length === 0)}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-md bg-primary text-primary-foreground hover:opacity-90 disabled:opacity-40"
+              aria-label="Send"
+            >
+              {isBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <SendHorizonal className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <AttachmentsButton onAdd={addFiles} />
+            {advanced && <ModelPicker />}
+          </div>
         </div>
       </form>
     </div>
