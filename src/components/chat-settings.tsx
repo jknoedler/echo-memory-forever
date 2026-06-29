@@ -321,8 +321,32 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.venice && (
+            <button
+              type="button"
+              onClick={pickEnvVenice}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envVeniceActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Venice (project key)</span>
+                <span className="block text-[10px] truncate">
+                  venice-uncensored · default fallback
+                </span>
+              </span>
+              {envVeniceActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
+
           {envQ.data?.llama && !connectedByCat.get("llama") && (
             <button
               type="button"
