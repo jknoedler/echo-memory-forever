@@ -30,7 +30,7 @@ import {
   sweepRecalibrations,
   updateStyleFingerprint,
 } from "@/lib/personality.server";
-import { FALLBACK_PREAMBLE, FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal } from "@/lib/refusal";
+import { FALLBACK_PREAMBLE, FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
 import type { Database } from "@/integrations/supabase/types";
 
 function isNewKey(v: string) {
