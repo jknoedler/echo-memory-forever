@@ -17,10 +17,22 @@ export function AppShell({ children }: { children: ReactNode }) {
   const matchRoute = useMatchRoute();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState<string>("");
+  const [collapsed, setCollapsed] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(SIDEBAR_KEY) === "1";
+  });
+  const [showAll, setShowAll] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0");
+    }
+  }, [collapsed]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? ""));
   }, []);
+
 
   const threadsQ = useQuery({
     queryKey: ["threads"],
