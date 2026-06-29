@@ -32,7 +32,7 @@ export const createStagedTask = createServerFn({ method: "POST" })
         user_id: context.userId,
         title: data.title,
         description: data.description ?? null,
-        payload: data.payload ?? {},
+        payload: (data.payload ?? {}) as never,
         due_at: data.due_at ?? null,
         thread_id: data.thread_id ?? null,
       })
