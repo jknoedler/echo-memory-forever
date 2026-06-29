@@ -126,7 +126,7 @@ export const Route = createFileRoute("/api/chat")({
         const { data: settings } = await supabase
           .from("user_settings")
           .select(
-            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id",
+            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id, fallback_provider_kind",
           )
           .eq("user_id", userId)
           .maybeSingle();
@@ -155,14 +155,20 @@ export const Route = createFileRoute("/api/chat")({
           if (ap) activeProvider = ap;
         }
 
-        // Capability-fallback provider — used when primary refuses.
+        // Capability-fallback provider — used when primary refuses. Can be
+        // either a saved library row OR an env-key built-in (groq/openai).
         let fallbackProvider = null as null | {
           catalog_id: string;
           base_url: string | null;
           api_key: string | null;
           default_model: string | null;
         };
-        if (
+        let fallbackEnvKind: "groq" | "openai" | null = null;
+        if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
+          fallbackEnvKind = "groq";
+        } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
+          fallbackEnvKind = "openai";
+        } else if (
           settings?.fallback_provider_id &&
           settings.fallback_provider_id !== settings.active_provider_id
         ) {
