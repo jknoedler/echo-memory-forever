@@ -278,8 +278,31 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.groq && !connectedByCat.get("groq") && (
+            <button
+              type="button"
+              onClick={pickEnvGroq}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envGroqActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Groq (project key)</span>
+                <span className="block text-[10px] truncate">
+                  llama-3.3-70b-versatile · uses GROQ_API_KEY
+                </span>
+              </span>
+              {envGroqActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           {envQ.data?.openai && !connectedByCat.get("openai") && (
             <button
               type="button"
