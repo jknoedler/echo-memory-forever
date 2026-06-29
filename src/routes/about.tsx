@@ -26,9 +26,7 @@ function About() {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border/60 backdrop-blur sticky top-0 z-30 bg-background/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
-          <Link to="/" className="flex items-center gap-2">
-            <Mement0Logo to="/" />
-          </Link>
+          <Mement0Logo to="/" />
           <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
             <a href="#promise" className="hover:text-foreground transition-colors">The promise</a>
             <a href="#architecture" className="hover:text-foreground transition-colors">Architecture</a>
