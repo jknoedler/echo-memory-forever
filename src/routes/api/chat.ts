@@ -163,11 +163,13 @@ export const Route = createFileRoute("/api/chat")({
           api_key: string | null;
           default_model: string | null;
         };
-        let fallbackEnvKind: "groq" | "openai" | null = null;
+        let fallbackEnvKind: "groq" | "openai" | "llama" | null = null;
         if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
           fallbackEnvKind = "groq";
         } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
           fallbackEnvKind = "openai";
+        } else if (settings?.fallback_provider_kind === "llama" && process.env.LLAMA_API_KEY) {
+          fallbackEnvKind = "llama";
         } else if (
           settings?.fallback_provider_id &&
           settings.fallback_provider_id !== settings.active_provider_id
