@@ -254,20 +254,38 @@ export const Route = createFileRoute("/api/chat")({
           continuityBlock,
         ].join("\n");
 
-        // Resolve provider
-        let model;
+        // Resolve primary provider
+        let primaryModel;
         try {
           const resolved = resolveProvider(cfg, {
             lovableApiKey: process.env.LOVABLE_API_KEY,
             openaiApiKey: process.env.OPENAI_API_KEY,
             activeProvider,
           });
-          model = resolved.model;
+          primaryModel = resolved.model;
         } catch (e) {
           return new Response(
             `Provider error: ${e instanceof Error ? e.message : String(e)}`,
             { status: 500 },
           );
+        }
+
+        // Resolve fallback provider (best-effort — never blocks primary).
+        let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
+        if (fallbackProvider) {
+          try {
+            const resolvedFb = resolveProvider(
+              { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
+              {
+                lovableApiKey: process.env.LOVABLE_API_KEY,
+                openaiApiKey: process.env.OPENAI_API_KEY,
+                activeProvider: fallbackProvider,
+              },
+            );
+            fallbackModel = resolvedFb.model;
+          } catch {
+            fallbackModel = null;
+          }
         }
 
         // Save the user message now (before streaming) so it shows up even
@@ -323,39 +341,108 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        const result = streamText({
-          model,
-          system,
-          messages: await convertToModelMessages(messages),
-          onFinish: async (event) => {
-            const assistantText = event.text ?? "";
-            if (!assistantText) return;
-            await supabase.from("messages").insert({
-              thread_id: threadId,
-              user_id: userId,
-              role: "assistant",
-              content: assistantText,
-              parts: null,
-            });
-            const vec = await embedText(assistantText);
-            if (vec) {
-              await supabase.from("memories").insert({
-                user_id: userId,
-                thread_id: threadId,
-                source: "message",
-                content: assistantText,
-                embedding: vec as unknown as string,
-                metadata: { role: "assistant" },
-              });
-            }
-            await supabase
-              .from("threads")
-              .update({ last_message_at: new Date().toISOString() })
-              .eq("id", threadId);
+        const convertedMessages = await convertToModelMessages(messages);
 
-            // Regenerate multi-topic title (best-effort, non-blocking).
+        // Persist an assistant turn (message row + memory embedding +
+        // thread bookkeeping). Used for both primary and fallback messages.
+        async function persistAssistant(text: string, meta?: Record<string, unknown>) {
+          if (!text) return;
+          await supabase.from("messages").insert({
+            thread_id: threadId!,
+            user_id: userId,
+            role: "assistant",
+            content: text,
+            parts: null,
+          });
+          const vec = await embedText(text);
+          if (vec) {
+            await supabase.from("memories").insert({
+              user_id: userId,
+              thread_id: threadId!,
+              source: "message",
+              content: text,
+              embedding: vec as unknown as string,
+              metadata: { role: "assistant", ...(meta ?? {}) },
+            });
+          }
+          await supabase
+            .from("threads")
+            .update({ last_message_at: new Date().toISOString() })
+            .eq("id", threadId!);
+        }
+
+        // Build the streamed response. Primary streams normally. If it ends
+        // up looking like a refusal AND the user has a fallback provider
+        // configured, we open a second assistant message and stream the
+        // fallback response into it — same shape as OpenRouter's auto-router.
+        const uiStream = createUIMessageStream({
+          execute: async ({ writer }) => {
+            let primaryText = "";
+            const primary = streamText({
+              model: primaryModel,
+              system,
+              messages: convertedMessages,
+              onFinish: (e) => {
+                primaryText = e.text ?? "";
+              },
+            });
+            writer.merge(primary.toUIMessageStream({ sendStart: true, sendFinish: true }));
+            // Wait until the primary stream is fully done before deciding
+            // whether to fire the fallback.
+            await primary.consumeStream().catch(() => {});
+
+            await persistAssistant(primaryText, { tier: "primary" });
+
+            if (!fallbackModel || !looksLikeRefusal(primaryText)) {
+              // Regenerate multi-topic title (best-effort).
+              try {
+                const { summarizeThreadTitle } = await import(
+                  "@/lib/thread-title.server"
+                );
+                const title = await summarizeThreadTitle(supabase, threadId);
+                if (title) {
+                  await supabase.from("threads").update({ title }).eq("id", threadId);
+                }
+              } catch {
+                /* title summary is best-effort */
+              }
+              return;
+            }
+
+            // Refusal path: stream the fallback as a second assistant message.
+            let fbText = "";
             try {
-              const { summarizeThreadTitle } = await import("@/lib/thread-title.server");
+              const fb = streamText({
+                model: fallbackModel,
+                system: system + FALLBACK_SYSTEM_SUFFIX,
+                messages: convertedMessages,
+                onFinish: (e) => {
+                  fbText = e.text ?? "";
+                },
+              });
+              writer.merge(fb.toUIMessageStream({ sendStart: true, sendFinish: true }));
+              await fb.consumeStream().catch(() => {});
+            } catch (err) {
+              const msg = `${FALLBACK_PREAMBLE}\n\n[fallback error: ${
+                err instanceof Error ? err.message : String(err)
+              }]`;
+              fbText = msg;
+            }
+
+            // Ensure the persisted fallback text always carries the preamble,
+            // even if the fallback model ignored the instruction to lead with it.
+            const persistedFb = fbText.startsWith(FALLBACK_PREAMBLE)
+              ? fbText
+              : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
+            await persistAssistant(persistedFb, {
+              tier: "fallback",
+              fallback_catalog: fallbackProvider?.catalog_id ?? null,
+            });
+
+            try {
+              const { summarizeThreadTitle } = await import(
+                "@/lib/thread-title.server"
+              );
               const title = await summarizeThreadTitle(supabase, threadId);
               if (title) {
                 await supabase.from("threads").update({ title }).eq("id", threadId);
@@ -364,10 +451,12 @@ export const Route = createFileRoute("/api/chat")({
               /* title summary is best-effort */
             }
           },
-
         });
 
-        return result.toUIMessageStreamResponse({ originalMessages: messages });
+        return createUIMessageStreamResponse({
+          stream: uiStream,
+          originalMessages: messages,
+        });
       },
     },
   },
