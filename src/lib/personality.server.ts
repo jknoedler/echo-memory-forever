@@ -173,9 +173,10 @@ export async function captureDirective(
 
   const highEmotion = emotion >= HIGH_EMOTION_THRESHOLD;
   const status = highEmotion ? "under_review" : "active";
-  const recalibrate_after = highEmotion
-    ? new Date(Date.now() + RECAL_WINDOW_MS).toISOString()
-    : null;
+  // Every new rule gets a 24h check-in, regardless of emotion.
+  // Lets the user reverse course on rules they regret without remembering
+  // the exact phrasing to undo.
+  const recalibrate_after = new Date(Date.now() + RECAL_WINDOW_MS).toISOString();
 
   const { data, error } = await supabase
     .from("personality_rules")
@@ -189,8 +190,8 @@ export async function captureDirective(
       recalibrate_after,
       source_message: text.slice(0, 1000),
       reason: highEmotion
-        ? "Captured during a high-emotion moment. Honor it now, re-confirm later."
-        : "Captured from explicit user directive.",
+        ? "Captured during a high-emotion moment. Honor it now, re-confirm in 24h."
+        : "Captured from explicit user directive. Re-confirm in 24h.",
     })
     .select("id, status, directive")
     .single();
