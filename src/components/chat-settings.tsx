@@ -178,7 +178,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -198,13 +198,16 @@ export function ModelPicker() {
   const activeId = settingsQ.data?.active_provider_id ?? null;
   const providerKind = settingsQ.data?.provider ?? "lovable";
   const envOpenAiActive = !activeId && providerKind === "openai";
+  const envGroqActive = !activeId && providerKind === "groq";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
     ? `${activeCat?.name ?? "Custom"} · ${settingsQ.data?.model || activeProvider?.default_model || "—"}`
     : envOpenAiActive
       ? `OpenAI · ${settingsQ.data?.model || "gpt-4o-mini"}`
-      : "Auto (recommended)";
+      : envGroqActive
+        ? `Groq · ${settingsQ.data?.model || "llama-3.3-70b-versatile"}`
+        : "Auto (recommended)";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
@@ -221,6 +224,15 @@ export function ModelPicker() {
       provider_id: null,
       provider_kind: "openai",
       model: cat?.models[0] ?? "gpt-4o-mini",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvGroq() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "groq",
+      model: "llama-3.3-70b-versatile",
     });
     setOpen(false);
   }
