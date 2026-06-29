@@ -90,6 +90,18 @@ function ChatWindow({
     inputRef.current?.focus();
   }, [threadId]);
 
+  // Auto-send a prompt stashed from the landing page
+  const consumedRef = useRef(false);
+  useEffect(() => {
+    if (consumedRef.current) return;
+    const pending = sessionStorage.getItem("mement0_pending_prompt");
+    if (pending && pending.trim()) {
+      consumedRef.current = true;
+      sessionStorage.removeItem("mement0_pending_prompt");
+      sendMessage({ text: pending });
+    }
+  }, [sendMessage]);
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, status]);
