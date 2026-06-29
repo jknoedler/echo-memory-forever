@@ -123,16 +123,31 @@ export function ChatSettings({
                 </p>
                 <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
                   If the primary model refuses or can't answer, auto-retry the
-                  same turn on this provider. Uses your library key.
+                  same turn on this provider.
                 </p>
                 <select
                   className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
-                  value={settingsQ.data?.fallback_provider_id ?? ""}
-                  onChange={(e) =>
-                    fallbackM.mutate(e.target.value || null)
+                  value={
+                    settingsQ.data?.fallback_provider_kind === "groq"
+                      ? "env:groq"
+                      : settingsQ.data?.fallback_provider_kind === "openai"
+                        ? "env:openai"
+                        : settingsQ.data?.fallback_provider_id ?? ""
                   }
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
+                    else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
+                    else fallbackM.mutate({ id: v || null, kind: null });
+                  }}
                 >
                   <option value="">Off</option>
+                  {envQ.data?.groq && (
+                    <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
+                  )}
+                  {envQ.data?.openai && (
+                    <option value="env:openai">OpenAI (project key) · gpt-4o-mini</option>
+                  )}
                   {(providersQ.data ?? []).map((p) => {
                     const cat = findCatalog(p.catalog_id);
                     return (
@@ -143,18 +158,6 @@ export function ChatSettings({
                     );
                   })}
                 </select>
-                {(providersQ.data ?? []).length === 0 && (
-                  <p className="mt-1.5 text-[10px] text-muted-foreground">
-                    Add a provider in{" "}
-                    <a
-                      href="/library"
-                      className="underline hover:text-foreground"
-                    >
-                      /library
-                    </a>{" "}
-                    first.
-                  </p>
-                )}
               </div>
             </>
           )}
