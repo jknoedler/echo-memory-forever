@@ -194,7 +194,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -202,6 +202,7 @@ export function ModelPicker() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
