@@ -39,7 +39,7 @@ export function ChatSettings({
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const fallbackM = useMutation({
-    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | null }) =>
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | null }) =>
       updateMySettings({
         data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
       }),
@@ -49,6 +49,7 @@ export function ChatSettings({
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -128,23 +129,31 @@ export function ChatSettings({
                 <select
                   className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
                   value={
-                    settingsQ.data?.fallback_provider_kind === "groq"
-                      ? "env:groq"
-                      : settingsQ.data?.fallback_provider_kind === "openai"
-                        ? "env:openai"
-                        : settingsQ.data?.fallback_provider_kind === "llama"
-                          ? "env:llama"
-                          : settingsQ.data?.fallback_provider_id ?? ""
+                    settingsQ.data?.fallback_provider_kind === "venice"
+                      ? "env:venice"
+                      : settingsQ.data?.fallback_provider_kind === "groq"
+                        ? "env:groq"
+                        : settingsQ.data?.fallback_provider_kind === "openai"
+                          ? "env:openai"
+                          : settingsQ.data?.fallback_provider_kind === "llama"
+                            ? "env:llama"
+                            : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
+                    if (v === "env:venice") fallbackM.mutate({ id: null, kind: "venice" });
+                    else if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
                     else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
                     else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
-                  <option value="">Off</option>
+                  <option value="">
+                    {envQ.data?.venice ? "Auto (Venice — default)" : "Off"}
+                  </option>
+                  {envQ.data?.venice && (
+                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
+                  )}
                   {envQ.data?.llama && (
                     <option value="env:llama">Llama (project key) · Llama 3.3 70B</option>
                   )}
@@ -164,6 +173,7 @@ export function ChatSettings({
                     );
                   })}
                 </select>
+
               </div>
             </>
           )}
@@ -184,7 +194,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -192,6 +202,7 @@ export function ModelPicker() {
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
+
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -206,6 +217,7 @@ export function ModelPicker() {
   const envOpenAiActive = !activeId && providerKind === "openai";
   const envGroqActive = !activeId && providerKind === "groq";
   const envLlamaActive = !activeId && providerKind === "llama";
+  const envVeniceActive = !activeId && providerKind === "venice";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
@@ -216,7 +228,10 @@ export function ModelPicker() {
         ? `Groq · ${settingsQ.data?.model || "llama-3.3-70b-versatile"}`
         : envLlamaActive
           ? `Llama · ${settingsQ.data?.model || "Llama-3.3-70B-Instruct"}`
-          : "Auto (recommended)";
+          : envVeniceActive
+            ? `Venice · ${settingsQ.data?.model || "venice-uncensored"}`
+            : "Auto (recommended)";
+
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
@@ -254,6 +269,16 @@ export function ModelPicker() {
     });
     setOpen(false);
   }
+
+  function pickEnvVenice() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "venice",
+      model: "venice-uncensored",
+    });
+    setOpen(false);
+  }
+
 
   function pickCatalog(catId: string) {
     const connected = connectedByCat.get(catId);
@@ -296,8 +321,32 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.venice && (
+            <button
+              type="button"
+              onClick={pickEnvVenice}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envVeniceActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Venice (project key)</span>
+                <span className="block text-[10px] truncate">
+                  venice-uncensored · default fallback
+                </span>
+              </span>
+              {envVeniceActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
+
           {envQ.data?.llama && !connectedByCat.get("llama") && (
             <button
               type="button"

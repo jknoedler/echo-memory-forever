@@ -163,8 +163,10 @@ export const Route = createFileRoute("/api/chat")({
           api_key: string | null;
           default_model: string | null;
         };
-        let fallbackEnvKind: "groq" | "openai" | "llama" | null = null;
-        if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
+        let fallbackEnvKind: "groq" | "openai" | "llama" | "venice" | null = null;
+        if (settings?.fallback_provider_kind === "venice" && process.env.VENICE_API_KEY) {
+          fallbackEnvKind = "venice";
+        } else if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
           fallbackEnvKind = "groq";
         } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
           fallbackEnvKind = "openai";
@@ -180,7 +182,16 @@ export const Route = createFileRoute("/api/chat")({
             .eq("id", settings.fallback_provider_id)
             .maybeSingle();
           if (fb) fallbackProvider = fb;
+        } else if (
+          // No explicit fallback configured — default to Venice when the
+          // project key is present. Venice is the house uncensored fallback.
+          !settings?.fallback_provider_kind &&
+          !settings?.fallback_provider_id &&
+          process.env.VENICE_API_KEY
+        ) {
+          fallbackEnvKind = "venice";
         }
+
 
 
 
@@ -270,6 +281,7 @@ export const Route = createFileRoute("/api/chat")({
             openaiApiKey: process.env.OPENAI_API_KEY,
             groqApiKey: process.env.GROQ_API_KEY,
             llamaApiKey: process.env.LLAMA_API_KEY,
+            veniceApiKey: process.env.VENICE_API_KEY,
             activeProvider,
           });
           primaryModel = resolved.model;
@@ -280,17 +292,20 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
+
         // Resolve fallback provider (best-effort — never blocks primary).
         let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
         let fallbackLabel: string | null = null;
         if (fallbackEnvKind) {
           try {
             const fbModelId =
-              fallbackEnvKind === "groq"
-                ? "llama-3.3-70b-versatile"
-                : fallbackEnvKind === "llama"
-                  ? "Llama-3.3-70B-Instruct"
-                  : "gpt-4o-mini";
+              fallbackEnvKind === "venice"
+                ? "venice-uncensored"
+                : fallbackEnvKind === "groq"
+                  ? "llama-3.3-70b-versatile"
+                  : fallbackEnvKind === "llama"
+                    ? "Llama-3.3-70B-Instruct"
+                    : "gpt-4o-mini";
             const resolvedFb = resolveProvider(
               { ...cfg, provider: fallbackEnvKind, model: fbModelId },
               {
@@ -298,6 +313,7 @@ export const Route = createFileRoute("/api/chat")({
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
                 llamaApiKey: process.env.LLAMA_API_KEY,
+                veniceApiKey: process.env.VENICE_API_KEY,
                 activeProvider: null,
               },
             );
@@ -315,6 +331,7 @@ export const Route = createFileRoute("/api/chat")({
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
                 llamaApiKey: process.env.LLAMA_API_KEY,
+                veniceApiKey: process.env.VENICE_API_KEY,
                 activeProvider: fallbackProvider,
               },
             );
@@ -324,6 +341,7 @@ export const Route = createFileRoute("/api/chat")({
             fallbackModel = null;
           }
         }
+
 
         // Save the user message now (before streaming) so it shows up even
         // if the stream fails midway.
