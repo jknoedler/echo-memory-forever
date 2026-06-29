@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { toast } from "sonner";
 import { Brain } from "lucide-react";
 import { createThread, listThreads } from "@/lib/threads.functions";
-import { Mement0Mark } from "@/components/mement0-logo";
+
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: AppHome,
