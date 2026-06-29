@@ -201,8 +201,31 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.openai && !connectedByCat.get("openai") && (
+            <button
+              type="button"
+              onClick={pickEnvOpenAi}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envOpenAiActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">OpenAI (project key)</span>
+                <span className="block text-[10px] truncate">
+                  gpt-4o-mini · uses OPENAI_API_KEY
+                </span>
+              </span>
+              {envOpenAiActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           <div className="my-1 h-px bg-border" />
           {CATALOG.map((c) => {
             const conn = connectedByCat.get(c.id);
