@@ -58,6 +58,7 @@ function Landing() {
           <p className="mt-7 font-display text-5xl md:text-7xl font-semibold tracking-tight leading-[0.95] ember-text">Mement0</p>
           <h1 className="mt-2 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95] ember-text">MORE</h1>
           <p className="mt-2 text-xl md:text-2xl text-muted-foreground tracking-widest">0&nbsp;loss</p>
+          <p className="mt-4 text-xs uppercase tracking-[0.3em] text-primary/80">the 0 is for L's</p>
 
           <p className="mx-auto mt-10 max-w-2xl text-lg text-muted-foreground leading-relaxed">
             A lifelong, model-agnostic AI that remembers every thread of your life. Begin as a
