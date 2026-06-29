@@ -32,7 +32,7 @@ export function ChatSettings({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { mode, setMode } = useTheme();
+  const { mode, setMode, bgPalette, accentPalette, setBgPalette, setAccentPalette } = useTheme();
   const qc = useQueryClient();
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
