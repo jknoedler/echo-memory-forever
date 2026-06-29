@@ -99,15 +99,15 @@ function SettingsPage() {
           <h1 className="mt-1 text-3xl font-display tracking-tight">Settings</h1>
         </header>
 
-        <Card title="AI provider" subtitle="Model-agnostic. Default through the Lovable gateway, or point to any OpenAI-compatible endpoint.">
-          <Field label="Provider">
+        <Card title="AI provider" subtitle="By default Mement0 routes through our included gateway — no API key needed from you. Want to use your own keys instead? Switch to Custom and point at any OpenAI-compatible endpoint (OpenRouter, OpenAI direct, Anthropic via proxy, Ollama, vLLM, self-hosted llama).">
+          <Field label="Provider" hint="Default = included. Custom = bring your own key / endpoint.">
             <select
               value={form.provider}
               onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
               className="auth-input"
             >
-              <option value="lovable">Lovable AI Gateway (default)</option>
-              <option value="custom">Custom OpenAI-compatible endpoint</option>
+              <option value="lovable">Included gateway — no key required</option>
+              <option value="custom">Bring your own — OpenAI-compatible endpoint</option>
             </select>
           </Field>
 
