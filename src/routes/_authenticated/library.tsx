@@ -121,6 +121,8 @@ function LibraryPage() {
             {hosted.map((c) => (
               <ProviderCard
                 key={c.id}
+                cardRef={(el) => cardRefs.current.set(c.id, el)}
+                highlighted={pulse === c.id}
                 entry={c}
                 saved={addedByCatalog.get(c.id) ?? null}
                 isActive={(addedByCatalog.get(c.id)?.id ?? null) === activeId}
@@ -145,6 +147,8 @@ function LibraryPage() {
             {local.map((c) => (
               <ProviderCard
                 key={c.id}
+                cardRef={(el) => cardRefs.current.set(c.id, el)}
+                highlighted={pulse === c.id}
                 entry={c}
                 saved={addedByCatalog.get(c.id) ?? null}
                 isActive={(addedByCatalog.get(c.id)?.id ?? null) === activeId}
