@@ -188,7 +188,7 @@ function AuthPage() {
         }
         .auth-input:focus {
           border-color: var(--color-primary);
-          box-shadow: 0 0 0 3px oklch(0.78 0.14 68 / 0.18);
+          box-shadow: 0 0 0 3px oklch(0.74 0.12 22 / 0.18);
         }
       `}</style>
     </div>

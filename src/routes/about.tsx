@@ -44,7 +44,7 @@ function About() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 pointer-events-none opacity-50">
           <div className="absolute -top-32 left-1/2 -translate-x-1/2 h-[520px] w-[520px] rounded-full"
-               style={{ background: "radial-gradient(closest-side, oklch(0.78 0.14 68 / 0.18), transparent)" }} />
+               style={{ background: "radial-gradient(closest-side, oklch(0.74 0.12 22 / 0.18), transparent)" }} />
         </div>
         <div className="mx-auto max-w-5xl px-5 pt-20 pb-20 text-center relative">
           <p className="font-display text-5xl md:text-7xl font-semibold tracking-tight leading-[0.95] ember-text">Mement0</p>
