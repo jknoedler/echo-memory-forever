@@ -72,7 +72,7 @@ function Landing() {
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <header className="flex items-center justify-between px-5 py-4">
-        <Mement0Mark className="text-lg" />
+        <Mement0Logo to="/" />
         <nav className="flex items-center gap-5 text-sm text-muted-foreground">
           <Link to="/about" className="hover:text-foreground transition-colors">
             About
