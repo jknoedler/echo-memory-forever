@@ -126,7 +126,7 @@ export const Route = createFileRoute("/api/chat")({
         const { data: settings } = await supabase
           .from("user_settings")
           .select(
-            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id",
+            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id",
           )
           .eq("user_id", userId)
           .maybeSingle();
@@ -154,6 +154,27 @@ export const Route = createFileRoute("/api/chat")({
             .maybeSingle();
           if (ap) activeProvider = ap;
         }
+
+        // Capability-fallback provider — used when primary refuses.
+        let fallbackProvider = null as null | {
+          catalog_id: string;
+          base_url: string | null;
+          api_key: string | null;
+          default_model: string | null;
+        };
+        if (
+          settings?.fallback_provider_id &&
+          settings.fallback_provider_id !== settings.active_provider_id
+        ) {
+          const { data: fb } = await supabase
+            .from("user_providers")
+            .select("catalog_id, base_url, api_key, default_model")
+            .eq("id", settings.fallback_provider_id)
+            .maybeSingle();
+          if (fb) fallbackProvider = fb;
+        }
+
+
 
 
         const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
