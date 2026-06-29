@@ -1,9 +1,7 @@
 import { Link } from "@tanstack/react-router";
-import logoAsset from "@/assets/mement0-logo.png.asset.json";
 
 /**
  * The "slashed 0" square mark — SVG so it scales and themes cleanly.
- * Use this as the brand icon (sidebar toggle, small chrome).
  */
 export function Mement0Mark({
   className = "",
@@ -53,6 +51,10 @@ export function Mement0Mark({
   );
 }
 
+const bodoni = {
+  fontFamily: '"Bodoni Moda", "Bodoni 72", "Didot", "GFS Didot", serif',
+} as const;
+
 /**
  * Compact header lockup: slashed-0 mark + text wordmark.
  */
@@ -64,17 +66,51 @@ export function Mement0Logo({
   return (
     <Link to={to} className="group inline-flex items-center gap-2">
       <Mement0Mark size={24} className="text-foreground" />
-      <span className="font-display text-lg font-semibold tracking-tight">
-        Mement<span className="ember-text">0</span>
+      <span
+        className="text-lg font-semibold tracking-tight text-foreground"
+        style={bodoni}
+      >
+        Mement&Oslash;
       </span>
     </Link>
   );
 }
 
 /**
- * The full uploaded brand lockup (square mark + "Mement0" + "MORE").
- * Use on the landing/auth hero — not in tight chrome.
+ * The full brand lockup — black / white, Bodoni, with slashed-Ø.
+ * Used on landing + auth hero.
  */
 export function Mement0Hero({ className = "" }: { className?: string }) {
-  return <img src={logoAsset.url} alt="Mement0 — MORE" className={className} />;
+  return (
+    <div
+      className={`flex flex-col items-center justify-center text-foreground ${className}`}
+      aria-label="Mement\u00d8 — MORE"
+    >
+      <div
+        className="leading-none"
+        style={{
+          ...bodoni,
+          fontWeight: 700,
+          fontSize: "clamp(4rem, 18vw, 9rem)",
+          letterSpacing: "-0.02em",
+        }}
+      >
+        Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
+      </div>
+      <div
+        className="mt-3 text-foreground"
+        style={{
+          ...bodoni,
+          fontWeight: 400,
+          fontStyle: "italic",
+          fontSize: "clamp(1rem, 4vw, 1.5rem)",
+          letterSpacing: "0.35em",
+          textTransform: "uppercase",
+        }}
+      >
+        More
+      </div>
+    </div>
+  );
 }
+
