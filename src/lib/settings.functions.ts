@@ -5,11 +5,11 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 export const getMySettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const cols =
+      "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret, active_provider_id, fallback_provider_id";
     const { data, error } = await context.supabase
       .from("user_settings")
-      .select(
-        "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret, active_provider_id",
-      )
+      .select(cols)
       .eq("user_id", context.userId)
       .maybeSingle();
     if (error) throw new Error(error.message);
@@ -18,9 +18,7 @@ export const getMySettings = createServerFn({ method: "GET" })
       const { data: ins, error: insErr } = await context.supabase
         .from("user_settings")
         .insert({ user_id: context.userId })
-        .select(
-          "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, hotl_auto_execute, biometrics_secret, active_provider_id",
-        )
+        .select(cols)
         .single();
       if (insErr) throw new Error(insErr.message);
       return ins;
@@ -36,6 +34,7 @@ const SettingsUpdate = z.object({
   custom_model_id: z.string().max(200).nullable().optional(),
   system_prompt_override: z.string().max(8000).nullable().optional(),
   hotl_auto_execute: z.boolean().optional(),
+  fallback_provider_id: z.string().uuid().nullable().optional(),
 });
 
 export const updateMySettings = createServerFn({ method: "POST" })
