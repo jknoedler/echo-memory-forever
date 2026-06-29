@@ -173,6 +173,8 @@ function ProviderCard({
   onRemove,
   onActivate,
   onSaved,
+  cardRef,
+  highlighted,
 }: {
   entry: CatalogEntry;
   saved: { id: string; default_model: string | null; has_key: boolean } | null;
@@ -180,11 +182,18 @@ function ProviderCard({
   onRemove: (id: string) => void;
   onActivate: (id: string, model?: string) => void;
   onSaved: () => void;
+  cardRef?: (el: HTMLDivElement | null) => void;
+  highlighted?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState(entry.baseUrl);
   const [model, setModel] = useState(saved?.default_model || entry.models[0] || "");
+
+  // Auto-open the add form when navigated to with focus and not yet saved.
+  useEffect(() => {
+    if (highlighted && !saved) setOpen(true);
+  }, [highlighted, saved]);
 
   const addM = useMutation({
     mutationFn: () =>
@@ -208,9 +217,10 @@ function ProviderCard({
 
   return (
     <div
-      className={`rounded-xl border bg-card p-4 space-y-3 transition-colors ${
+      ref={cardRef}
+      className={`rounded-xl border bg-card p-4 space-y-3 transition-all ${
         isActive ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
-      }`}
+      } ${highlighted ? "ring-2 ring-primary shadow-[0_0_40px_-8px_oklch(0.78_0.14_68_/_0.6)]" : ""}`}
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
