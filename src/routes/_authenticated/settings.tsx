@@ -111,7 +111,18 @@ function SettingsPage() {
           <Field label="Provider" hint="Included = our gateway. OpenAI = direct via OPENAI_API_KEY. Custom = your own endpoint.">
             <select
               value={form.provider}
-              onChange={(e) => setForm((f) => ({ ...f, provider: e.target.value }))}
+              onChange={(e) => {
+                const provider = e.target.value;
+                setForm((f) => {
+                  let model = f.model;
+                  if (provider === "lovable" && !LOVABLE_MODELS.includes(model)) {
+                    model = "google/gemini-3-flash-preview";
+                  } else if (provider === "openai" && !OPENAI_DIRECT_MODELS.includes(model)) {
+                    model = "gpt-4o-mini";
+                  }
+                  return { ...f, provider, model };
+                });
+              }}
               className="auth-input"
             >
               <option value="lovable">Included gateway — no key required</option>
