@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Settings as SettingsIcon, Sun, Moon, Monitor, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { useTheme, type ThemeMode } from "@/lib/theme";
+import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
@@ -31,7 +32,7 @@ export function ChatSettings({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { mode, setMode } = useTheme();
+  const { mode, setMode, bgPalette, accentPalette, setBgPalette, setAccentPalette } = useTheme();
   const qc = useQueryClient();
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
@@ -76,7 +77,7 @@ export function ChatSettings({
         <SettingsIcon className="h-4 w-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-50 w-64 rounded-lg border border-border bg-popover p-3 shadow-xl">
+        <div className="absolute right-0 top-9 z-50 w-72 rounded-lg border border-border bg-popover p-3 shadow-xl">
           <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
             Theme
           </p>
@@ -95,6 +96,46 @@ export function ChatSettings({
                 {t.icon}
                 {t.label}
               </button>
+            ))}
+          </div>
+
+          <div className="my-3 h-px bg-border" />
+
+          <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+            Background
+          </p>
+          <div className="grid grid-cols-8 gap-1.5 px-1">
+            {BG_PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setBgPalette(p.id)}
+                title={p.label}
+                aria-label={`Background ${p.label}`}
+                className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
+                  bgPalette === p.id ? "border-primary ring-2 ring-primary/40" : "border-border"
+                }`}
+                style={{ background: p.swatch }}
+              />
+            ))}
+          </div>
+
+          <p className="mt-3 px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
+            Accent
+          </p>
+          <div className="grid grid-cols-8 gap-1.5 px-1">
+            {ACCENT_PALETTES.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setAccentPalette(p.id)}
+                title={p.label}
+                aria-label={`Accent ${p.label}`}
+                className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
+                  accentPalette === p.id ? "border-foreground ring-2 ring-foreground/40" : "border-border"
+                }`}
+                style={{ background: p.swatch }}
+              />
             ))}
           </div>
 
