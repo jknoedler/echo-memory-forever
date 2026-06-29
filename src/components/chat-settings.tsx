@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { useTheme, type ThemeMode } from "@/lib/theme";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
-import { getMySettings } from "@/lib/settings.functions";
+import { getMySettings, updateMySettings } from "@/lib/settings.functions";
 
 const ADV_KEY = "mement0_advanced";
 
@@ -32,6 +32,19 @@ export function ChatSettings({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const { mode, setMode } = useTheme();
+  const qc = useQueryClient();
+  const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
+  const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
+
+  const fallbackM = useMutation({
+    mutationFn: (id: string | null) =>
+      updateMySettings({ data: { fallback_provider_id: id } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["settings"] });
+      toast.success("Fallback updated");
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
