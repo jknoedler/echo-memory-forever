@@ -77,7 +77,7 @@ export function ChatSettings({
         <SettingsIcon className="h-4 w-4" />
       </button>
       {open && (
-        <div className="absolute right-0 top-9 z-50 w-64 rounded-lg border border-border bg-popover p-3 shadow-xl">
+        <div className="absolute right-0 top-9 z-50 w-72 rounded-lg border border-border bg-popover p-3 shadow-xl">
           <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
             Theme
           </p>
