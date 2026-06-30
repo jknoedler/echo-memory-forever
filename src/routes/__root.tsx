@@ -112,11 +112,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image:type", content: "image/png" },
       { property: "og:image:alt", content: "MementØ — MORE / 0 loss" },
       { name: "twitter:title", content: "MementØ — MØRE" },
-      { name: "twitter:description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
-      { name: "description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
-      { property: "og:description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4f0969bc-51dd-49f2-9677-e721c2436047/id-preview-b6862ee9--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782801602475.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/4f0969bc-51dd-49f2-9677-e721c2436047/id-preview-b6862ee9--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782801602475.png" },
+      {
+        name: "twitter:description",
+        content:
+          "A lifelong AI memory and agentic OS. 0 loss. Your archive, eternal.",
+      },
     ],
     links: [
       {
