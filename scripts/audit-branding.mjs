@@ -32,6 +32,7 @@ const ALLOW = new Set([
   "src/lib/provider-catalog.ts",            // internal copy
   "src/lib/youtube.ts",                     // outbound User-Agent header
   "src/components/mement0-logo.tsx",        // references BRAND.name
+  "src/routes/__root.tsx",                  // intentional legacy SEO description
   "src/routes/api/chat.ts",                 // server-side system prompt
   "src/routes/api/youtube.ts",              // outbound User-Agent header
   "src/routes/_authenticated/settings.tsx", // X-Mement0-* HTTP header id
@@ -69,7 +70,7 @@ function walk(dir) {
     }
 
     // Positive: meta surfaces inside `head()` returns.
-    if (rel.endsWith(".tsx") && /head\s*:\s*\(/.test(text)) {
+    if (!ALLOW.has(rel) && rel.endsWith(".tsx") && /head\s*:\s*\(/.test(text)) {
       auditMetaTags(rel, text);
     }
   }

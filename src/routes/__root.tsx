@@ -91,7 +91,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "MementØ is a lifelong AI archive of your life. Lossless memory, model-agnostic, agentic. Your legacy, never forgotten.",
+          "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
       },
       { name: "author", content: "MementØ" },
       { name: "theme-color", content: "#0a0a0a" },
@@ -99,7 +99,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         property: "og:description",
         content:
-          "A lifelong AI memory and agentic OS. 0 loss. Your archive, eternal.",
+          "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
       },
       { property: "og:type", content: "website" },
       { property: "og:image", content: OG_IMAGE },
@@ -115,7 +115,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "twitter:description",
         content:
-          "A lifelong AI memory and agentic OS. 0 loss. Your archive, eternal.",
+          "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
       },
     ],
     links: [
