@@ -455,6 +455,22 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
+        // Tell the model what it is + how to be switched. This lets the user
+        // ask "what model are we running?" and get a real answer, and tells
+        // the model to acknowledge in-chat switches.
+        const switchAck = switchedTo
+          ? `\nThe user just asked to switch models. You are now ${switchedTo.label} (${switchedTo.provider}/${switchedTo.model}). Open your reply with a single short line confirming the switch (e.g. "Switched to ${switchedTo.label}."), then answer their question. Do not re-confirm on later turns.`
+          : "";
+        system += [
+          "",
+          "",
+          "### ACTIVE MODEL",
+          `provider=${primaryLabel}`,
+          `model=${primaryModelId}`,
+          `If the user asks "what model are we running" / "which model is this" / "what AI am I talking to", answer with exactly: "${primaryLabel} — ${primaryModelId}". Do not invent a different model name.`,
+          `Users can switch models from chat by saying things like "switch to gemini", "use groq", "change to gpt-4o", "use venice", "switch to gemini 2.5 pro". You don't perform the switch yourself — the platform parses the command before you see it. If the user asks how to switch, list the available built-ins: groq, gemini, openrouter, openai, venice, llama.${switchAck}`,
+        ].join("\n");
+
         // Resolve fallback providers (best-effort — never blocks primary).
         // One dead upstream should never make chat look dead; we walk every
         // configured built-in after the preferred fallback and stop at the
