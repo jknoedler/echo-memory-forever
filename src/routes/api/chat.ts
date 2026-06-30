@@ -179,15 +179,19 @@ export const Route = createFileRoute("/api/chat")({
           api_key: string | null;
           default_model: string | null;
         };
-        let fallbackEnvKind: "groq" | "openai" | "llama" | "venice" | null = null;
-        if (settings?.fallback_provider_kind === "venice" && process.env.VENICE_API_KEY) {
-          fallbackEnvKind = "venice";
-        } else if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
-          fallbackEnvKind = "groq";
-        } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
-          fallbackEnvKind = "openai";
-        } else if (settings?.fallback_provider_kind === "llama" && process.env.LLAMA_API_KEY) {
-          fallbackEnvKind = "llama";
+        type FbKind = "groq" | "openai" | "llama" | "venice" | "gemini" | "openrouter";
+        const FB_ENV: Record<FbKind, string | undefined> = {
+          groq: process.env.GROQ_API_KEY,
+          openai: process.env.OPENAI_API_KEY,
+          llama: process.env.LLAMA_API_KEY,
+          venice: process.env.VENICE_API_KEY,
+          gemini: process.env.GEMINI_API_KEY,
+          openrouter: process.env.OPENROUTER_API_KEY,
+        };
+        let fallbackEnvKind: FbKind | null = null;
+        const requested = settings?.fallback_provider_kind as FbKind | undefined;
+        if (requested && FB_ENV[requested]) {
+          fallbackEnvKind = requested;
         } else if (
           settings?.fallback_provider_id &&
           settings.fallback_provider_id !== settings.active_provider_id
@@ -198,14 +202,12 @@ export const Route = createFileRoute("/api/chat")({
             .eq("id", settings.fallback_provider_id)
             .maybeSingle();
           if (fb) fallbackProvider = fb;
-        } else if (
-          // No explicit fallback configured — default to Venice when the
-          // project key is present. Venice is the house uncensored fallback.
-          !settings?.fallback_provider_kind &&
-          !settings?.fallback_provider_id &&
-          process.env.VENICE_API_KEY
-        ) {
-          fallbackEnvKind = "venice";
+        } else if (!settings?.fallback_provider_kind && !settings?.fallback_provider_id) {
+          // No explicit fallback configured — default to Venice (uncensored
+          // house fallback), then Gemini, then Groq.
+          if (FB_ENV.venice) fallbackEnvKind = "venice";
+          else if (FB_ENV.gemini) fallbackEnvKind = "gemini";
+          else if (FB_ENV.groq) fallbackEnvKind = "groq";
         }
 
 
