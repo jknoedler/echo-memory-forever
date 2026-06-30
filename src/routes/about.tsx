@@ -12,12 +12,13 @@ export const Route = createFileRoute("/about")({
           "MementØ is a lifelong, model-agnostic AI archive. MORE memory. 0 loss. Built to grow with you and outlive you.",
       },
       { property: "og:title", content: "About — MementØ" },
+      { property: "og:url", content: "https://mement0.com/about" },
       {
         property: "og:description",
         content: "Lifelong AI archive. 0 loss memory. Agentic. Eternal.",
       },
     ],
-    links: [{ rel: "canonical", href: "/about" }],
+    links: [{ rel: "canonical", href: "https://mement0.com/about" }],
   }),
   component: About,
 });
