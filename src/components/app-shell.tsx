@@ -242,33 +242,47 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="h-dvh flex bg-background text-foreground overflow-hidden">
       {/* Desktop sidebar */}
-      {collapsed ? (
-        <aside className="hidden md:flex md:w-12 flex-col items-center border-r border-border bg-sidebar py-3 gap-2">
-          <button
-            type="button"
-            onClick={() => setCollapsed(false)}
-            className="p-1.5 text-muted-foreground hover:text-foreground rounded-md"
-            aria-label="Expand archive"
-            title="Expand archive"
-          >
-            <Mement0Mark size={22} />
-          </button>
-          <button
-            type="button"
-            onClick={() => createM.mutate()}
-            disabled={createM.isPending}
-            className="p-2 rounded-md bg-primary text-primary-foreground"
-            aria-label="New thread"
-            title="New thread"
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </aside>
-      ) : (
-        <aside className="hidden md:flex md:w-72 flex-col border-r border-border bg-sidebar">
-          <SidebarBody />
-        </aside>
-      )}
+      <div className="relative hidden md:flex">
+        {collapsed ? (
+          <aside className="flex md:w-12 flex-col items-center border-r border-border bg-sidebar py-3 gap-2">
+            <button
+              type="button"
+              onClick={() => setCollapsed(false)}
+              className="p-1.5 text-muted-foreground hover:text-foreground rounded-md"
+              aria-label="Expand archive"
+              title="Expand archive"
+            >
+              <Mement0Mark size={22} />
+            </button>
+            <button
+              type="button"
+              onClick={() => createM.mutate()}
+              disabled={createM.isPending}
+              className="p-2 rounded-md bg-primary text-primary-foreground"
+              aria-label="New thread"
+              title="New thread"
+            >
+              <Plus className="h-4 w-4" />
+            </button>
+          </aside>
+        ) : (
+          <aside className="flex md:w-72 flex-col border-r border-border bg-sidebar">
+            <SidebarBody />
+          </aside>
+        )}
+        {/* Always-visible edge handle so users can find the archive panel.
+            Points → when collapsed (open it) and ← when open (close it). */}
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? "Open archive" : "Close archive"}
+          title={collapsed ? "Open archive" : "Close archive"}
+          aria-expanded={!collapsed}
+          className="absolute top-1/2 -translate-y-1/2 -right-3 z-30 h-12 w-6 flex items-center justify-center rounded-r-md border border-l-0 border-border bg-sidebar text-muted-foreground hover:text-foreground hover:bg-sidebar-accent shadow-sm transition-colors"
+        >
+          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </button>
+      </div>
 
       {/* Mobile drawer */}
       <div
