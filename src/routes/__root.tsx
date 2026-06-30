@@ -87,7 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MementØ — MORE / 0 loss" },
+      { title: "MementØ — MØRE" },
       {
         name: "description",
         content:
@@ -95,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { name: "author", content: "MementØ" },
       { name: "theme-color", content: "#0a0a0a" },
-      { property: "og:title", content: "MementØ — MORE / 0 loss" },
+      { property: "og:title", content: "MementØ — MØRE" },
       {
         property: "og:description",
         content:
@@ -111,6 +111,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       // are the explicit hints LinkedIn's post-inspector checks for.
       { property: "og:image:type", content: "image/png" },
       { property: "og:image:alt", content: "MementØ — MORE / 0 loss" },
+      { name: "twitter:title", content: "MementØ — MØRE" },
+      { name: "description", content: "0 loss archival agentic ai." },
+      { property: "og:description", content: "0 loss archival agentic ai." },
+      { name: "twitter:description", content: "0 loss archival agentic ai." },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/66bd8ed4-d60b-45a5-8987-a835bc3a8fc6" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/66bd8ed4-d60b-45a5-8987-a835bc3a8fc6" },
     ],
     links: [
       {
