@@ -16,7 +16,6 @@ import {
   convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
-  generateText,
   streamText,
   type UIMessage,
 } from "ai";
