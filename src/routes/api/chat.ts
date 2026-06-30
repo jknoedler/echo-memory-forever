@@ -378,6 +378,32 @@ export const Route = createFileRoute("/api/chat")({
           continuityBlock,
         ].join("\n");
 
+        // Persist a debug snapshot of what the model is about to see. Used
+        // by /api/debug/last-prompt to verify the CALENDAR EVENTS payload
+        // in staging. Best-effort — never blocks the chat turn.
+        let debugPayloadId: string | null = null;
+        try {
+          const { data: dbg } = await supabase
+            .from("chat_debug_payloads")
+            .insert({
+              user_id: userId,
+              thread_id: threadId,
+              system_prompt: system,
+              events_block: eventsBlock || null,
+              events_count: eventsSummary.count,
+              events_oldest: eventsSummary.oldest,
+              events_newest: eventsSummary.newest,
+              stale_events_count: eventsSummary.staleCount,
+              validator_status: "pending",
+              retried: false,
+            })
+            .select("id")
+            .maybeSingle();
+          debugPayloadId = dbg?.id ?? null;
+        } catch (e) {
+          console.warn("[chat] failed to persist debug payload:", e);
+        }
+
         // Resolve primary provider
         let primaryModel: ReturnType<typeof resolveProvider>["model"];
         try {
