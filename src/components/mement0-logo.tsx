@@ -56,6 +56,25 @@ const bodoni = {
 } as const;
 
 /**
+ * Inline wordmark: "Mement" in foreground + slashed-Ø in foreground.
+ * Use this anywhere you'd otherwise write "Mement0" as text — keeps the
+ * branding uniform (no amber/yellow, always the slashed-0 glyph).
+ */
+export function Mement0Wordmark({
+  className = "",
+  as: Tag = "span",
+}: {
+  className?: string;
+  as?: "span" | "h1" | "h2" | "p" | "div";
+}) {
+  return (
+    <Tag className={className} style={bodoni}>
+      Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
+    </Tag>
+  );
+}
+
+/**
  * Compact header lockup: slashed-0 mark + text wordmark.
  */
 export function Mement0Logo({
@@ -66,15 +85,11 @@ export function Mement0Logo({
   return (
     <Link to={to} className="group inline-flex items-center gap-2">
       <Mement0Mark size={24} className="text-foreground" />
-      <span
-        className="text-lg font-semibold tracking-tight text-foreground"
-        style={bodoni}
-      >
-        Mement&Oslash;
-      </span>
+      <Mement0Wordmark className="text-lg font-semibold tracking-tight text-foreground" />
     </Link>
   );
 }
+
 
 /**
  * The full brand lockup — black / white, Bodoni, with slashed-Ø.
