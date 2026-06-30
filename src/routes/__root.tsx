@@ -117,6 +117,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
       },
+      { name: "description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
+      { property: "og:description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
+      { name: "twitter:description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/68308dae-f043-48d0-bd78-1cb927bd40d8/id-preview-b689bc67--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782807497723.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/68308dae-f043-48d0-bd78-1cb927bd40d8/id-preview-b689bc67--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782807497723.png" },
     ],
     links: [
       {
