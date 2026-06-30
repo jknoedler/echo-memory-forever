@@ -54,6 +54,22 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+/*
+ * Single accent token set (obsidian purple by default).
+ *
+ * All chromatic accents in the app derive from ONE source — `--primary`
+ * (paired with `--primary-foreground`). Anything that used to carry its
+ * own amber literal — `--ring`, `--ember`, `--sidebar-primary`,
+ * `--sidebar-ring`, ::selection, ember-glow — now reads back through
+ * `var(--primary)` via `color-mix` for alpha variants. That makes it
+ * impossible to reintroduce amber by editing one place and missing
+ * another: there is exactly one place to change the accent.
+ *
+ * Runtime palette swaps in src/lib/palette.ts only set `--primary`,
+ * `--primary-foreground`, and the neutral surface ramp; every other
+ * accent variable cascades automatically from `--primary`.
+ */
+
 :root {
   --radius: 0.5rem;
 
@@ -66,6 +82,7 @@
   --popover: oklch(0.165 0.006 80);
   --popover-foreground: oklch(0.965 0.006 80);
 
+  /* THE single accent. Change this one line to retheme the entire app. */
   --primary: oklch(0.60 0.15 295);
   --primary-foreground: oklch(0.98 0.02 295);
 
@@ -83,19 +100,20 @@
 
   --border: oklch(0.26 0.006 80);
   --input: oklch(0.24 0.006 80);
-  --ring: oklch(0.60 0.15 295);
 
-  --ember: oklch(0.60 0.15 295);
-  --ember-foreground: oklch(0.98 0.02 295);
+  /* Derived — never set independently. */
+  --ring: var(--primary);
+  --ember: var(--primary);
+  --ember-foreground: var(--primary-foreground);
 
   --sidebar: oklch(0.115 0.006 80);
   --sidebar-foreground: oklch(0.92 0.006 80);
-  --sidebar-primary: oklch(0.60 0.15 295);
-  --sidebar-primary-foreground: oklch(0.98 0.02 295);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.20 0.006 80);
   --sidebar-accent-foreground: oklch(0.96 0.006 80);
   --sidebar-border: oklch(0.22 0.006 80);
-  --sidebar-ring: oklch(0.60 0.15 295);
+  --sidebar-ring: var(--primary);
 }
 
 .dark {
@@ -117,17 +135,17 @@
   --destructive-foreground: oklch(0.98 0.006 80);
   --border: oklch(0.26 0.006 80);
   --input: oklch(0.24 0.006 80);
-  --ring: oklch(0.60 0.15 295);
-  --ember: oklch(0.60 0.15 295);
-  --ember-foreground: oklch(0.98 0.02 295);
+  --ring: var(--primary);
+  --ember: var(--primary);
+  --ember-foreground: var(--primary-foreground);
   --sidebar: oklch(0.115 0.006 80);
   --sidebar-foreground: oklch(0.92 0.006 80);
-  --sidebar-primary: oklch(0.60 0.15 295);
-  --sidebar-primary-foreground: oklch(0.98 0.02 295);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.20 0.006 80);
   --sidebar-accent-foreground: oklch(0.96 0.006 80);
   --sidebar-border: oklch(0.22 0.006 80);
-  --sidebar-ring: oklch(0.60 0.15 295);
+  --sidebar-ring: var(--primary);
 }
 
 .light {
@@ -138,7 +156,7 @@
   --popover: oklch(0.99 0.005 80);
   --popover-foreground: oklch(0.18 0.01 80);
   --primary: oklch(0.48 0.18 295);
-  --primary-foreground: oklch(0.99 0.005 80);
+  --primary-foreground: oklch(0.99 0.005 295);
   --secondary: oklch(0.93 0.005 80);
   --secondary-foreground: oklch(0.22 0.01 80);
   --muted: oklch(0.94 0.005 80);
@@ -149,17 +167,17 @@
   --destructive-foreground: oklch(0.99 0.005 80);
   --border: oklch(0.88 0.005 80);
   --input: oklch(0.92 0.005 80);
-  --ring: oklch(0.48 0.18 295);
-  --ember: oklch(0.48 0.18 295);
-  --ember-foreground: oklch(0.99 0.005 80);
+  --ring: var(--primary);
+  --ember: var(--primary);
+  --ember-foreground: var(--primary-foreground);
   --sidebar: oklch(0.96 0.005 80);
   --sidebar-foreground: oklch(0.20 0.01 80);
-  --sidebar-primary: oklch(0.48 0.18 295);
-  --sidebar-primary-foreground: oklch(0.99 0.005 80);
+  --sidebar-primary: var(--primary);
+  --sidebar-primary-foreground: var(--primary-foreground);
   --sidebar-accent: oklch(0.92 0.01 70);
   --sidebar-accent-foreground: oklch(0.20 0.01 80);
   --sidebar-border: oklch(0.88 0.005 80);
-  --sidebar-ring: oklch(0.48 0.18 295);
+  --sidebar-ring: var(--primary);
 }
 
 @layer base {
@@ -177,15 +195,15 @@
   }
 
   ::selection {
-    background: oklch(0.60 0.15 295 / 0.35);
+    background: color-mix(in oklab, var(--primary) 35%, transparent);
     color: var(--color-foreground);
   }
 }
 
 @utility ember-glow {
   box-shadow:
-    0 0 0 1px oklch(0.60 0.15 295 / 0.25),
-    0 0 24px -4px oklch(0.60 0.15 295 / 0.35);
+    0 0 0 1px color-mix(in oklab, var(--primary) 25%, transparent),
+    0 0 24px -4px color-mix(in oklab, var(--primary) 35%, transparent);
 }
 
 @utility grain {
@@ -198,4 +216,6 @@
   opacity: 0.04;
   background-image: radial-gradient(oklch(1 0 0 / 0.7) 1px, transparent 1px);
   background-size: 3px 3px;
+}
+
 }
