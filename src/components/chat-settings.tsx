@@ -74,32 +74,10 @@ export function ChatSettings({
       {open && (
         <div className="absolute right-0 top-9 z-50 w-72 rounded-lg border border-border bg-popover p-3 shadow-xl">
           <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-            Theme
-          </p>
-          <div className="grid grid-cols-3 gap-1">
-            {themes.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setMode(t.id)}
-                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs transition-colors ${
-                  mode === t.id
-                    ? "border-primary/60 bg-primary/10 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-secondary"
-                }`}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="my-3 h-px bg-border" />
-
-          <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
             Background
           </p>
-          <div className="grid grid-cols-8 gap-1.5 px-1">
+          <div className="grid grid-cols-3 gap-1.5 px-1">
+
             {BG_PALETTES.map((p) => (
               <button
                 key={p.id}
