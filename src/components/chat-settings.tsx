@@ -85,11 +85,18 @@ export function ChatSettings({
                 onClick={() => setBgPalette(p.id)}
                 title={p.label}
                 aria-label={`Background ${p.label}`}
-                className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
-                  bgPalette === p.id ? "border-primary ring-2 ring-primary/40" : "border-border"
+                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-[11px] transition-colors ${
+                  bgPalette === p.id
+                    ? "border-primary/60 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-secondary"
                 }`}
-                style={{ background: p.swatch }}
-              />
+              >
+                <span
+                  className="h-5 w-5 rounded-full border border-border"
+                  style={{ background: p.swatch }}
+                />
+                {p.label}
+              </button>
             ))}
           </div>
 
