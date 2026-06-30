@@ -405,7 +405,11 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         // Resolve primary provider
-        let primaryModel: ReturnType<typeof resolveProvider>["model"];
+        type ChatModel = ReturnType<typeof resolveProvider>["model"];
+        type ModelCandidate = { model: ChatModel; label: string; modelId: string };
+        let primaryModel: ChatModel;
+        let primaryLabel = "primary";
+        let primaryModelId = "";
         try {
           const resolved = resolveProvider(cfg, {
             openaiApiKey: process.env.OPENAI_API_KEY,
@@ -415,6 +419,8 @@ export const Route = createFileRoute("/api/chat")({
             activeProvider,
           });
           primaryModel = resolved.model;
+          primaryLabel = resolved.providerName;
+          primaryModelId = resolved.modelId;
         } catch (e) {
           return new Response(
             `Provider error: ${e instanceof Error ? e.message : String(e)}`,
@@ -423,9 +429,19 @@ export const Route = createFileRoute("/api/chat")({
         }
 
 
-        // Resolve fallback provider (best-effort — never blocks primary).
-        let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
-        let fallbackLabel: string | null = null;
+        // Resolve fallback providers (best-effort — never blocks primary).
+        // One dead upstream should never make chat look dead; we walk every
+        // configured built-in after the preferred fallback and stop at the
+        // first provider that actually streams text.
+        const fallbackCandidates: ModelCandidate[] = [];
+        const seenCandidates = new Set<string>([`${primaryLabel}:${primaryModelId}`]);
+        const addFallbackCandidate = (candidate: ModelCandidate | null) => {
+          if (!candidate) return;
+          const key = `${candidate.label}:${candidate.modelId}`;
+          if (seenCandidates.has(key)) return;
+          seenCandidates.add(key);
+          fallbackCandidates.push(candidate);
+        };
         if (fallbackEnvKind) {
           try {
             const fbModelId =
@@ -446,10 +462,13 @@ export const Route = createFileRoute("/api/chat")({
                 activeProvider: null,
               },
             );
-            fallbackModel = resolvedFb.model;
-            fallbackLabel = fallbackEnvKind;
+            addFallbackCandidate({
+              model: resolvedFb.model,
+              label: resolvedFb.providerName,
+              modelId: resolvedFb.modelId,
+            });
           } catch {
-            fallbackModel = null;
+            /* ignore unavailable preferred fallback */
           }
         } else if (fallbackProvider) {
           try {
@@ -463,12 +482,50 @@ export const Route = createFileRoute("/api/chat")({
                 activeProvider: fallbackProvider,
               },
             );
-            fallbackModel = resolvedFb.model;
-            fallbackLabel = fallbackProvider.catalog_id;
+            addFallbackCandidate({
+              model: resolvedFb.model,
+              label: resolvedFb.providerName,
+              modelId: resolvedFb.modelId,
+            });
           } catch {
-            fallbackModel = null;
+            /* ignore unavailable saved fallback */
           }
         }
+
+        const builtinModelId = (kind: "groq" | "openai" | "llama" | "venice") =>
+          kind === "venice"
+            ? "venice-uncensored"
+            : kind === "groq"
+              ? "llama-3.3-70b-versatile"
+              : kind === "llama"
+                ? "Llama-3.3-70B-Instruct"
+                : "gpt-4o-mini";
+        const addBuiltinFallback = (kind: "groq" | "openai" | "llama" | "venice") => {
+          if (kind === "groq" && !process.env.GROQ_API_KEY) return;
+          if (kind === "openai" && !process.env.OPENAI_API_KEY) return;
+          if (kind === "venice" && !process.env.VENICE_API_KEY) return;
+          if (kind === "llama" && !process.env.LLAMA_API_KEY) return;
+          try {
+            const resolved = resolveProvider(
+              { ...cfg, provider: kind, model: builtinModelId(kind) },
+              {
+                openaiApiKey: process.env.OPENAI_API_KEY,
+                groqApiKey: process.env.GROQ_API_KEY,
+                llamaApiKey: process.env.LLAMA_API_KEY,
+                veniceApiKey: process.env.VENICE_API_KEY,
+                activeProvider: null,
+              },
+            );
+            addFallbackCandidate({
+              model: resolved.model,
+              label: resolved.providerName,
+              modelId: resolved.modelId,
+            });
+          } catch {
+            /* ignore unavailable automatic fallback */
+          }
+        };
+        (["groq", "openai", "venice", "llama"] as const).forEach(addBuiltinFallback);
 
 
         // Save the user message now (before streaming) so it shows up even
@@ -564,7 +621,7 @@ export const Route = createFileRoute("/api/chat")({
         // Pre-emptive route: if the user's prompt obviously sits in a band
         // corporate models always refuse AND a fallback is configured, skip
         // the primary entirely and go straight to the fallback.
-        const preempt = !!fallbackModel && shouldPreemptToFallback(userText);
+        const preempt = fallbackCandidates.length > 0 && shouldPreemptToFallback(userText);
 
         const uiStream = createUIMessageStream({
           execute: async ({ writer }) => {
@@ -574,9 +631,10 @@ export const Route = createFileRoute("/api/chat")({
             // first delta arrives — so a model that fails before producing
             // anything leaves zero visible trace.
             async function runModel(
-              model: typeof primaryModel,
+              candidate: ModelCandidate,
               sys: string,
             ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
+              const { model, label } = candidate;
               const messageId = crypto.randomUUID();
               const partId = crypto.randomUUID();
               let started = false;
@@ -586,16 +644,24 @@ export const Route = createFileRoute("/api/chat")({
                   model,
                   system: sys,
                   messages: convertedMessages,
+                  maxRetries: 0,
                 });
-                for await (const delta of run.textStream) {
+                for await (const part of run.fullStream) {
+                  if (part.type === "error") {
+                    throw part.error;
+                  }
+                  if (part.type !== "text-delta") continue;
                   if (!started) {
                     writer.write({ type: "start", messageId });
                     writer.write({ type: "start-step" });
                     writer.write({ type: "text-start", id: partId });
                     started = true;
                   }
-                  text += delta;
-                  writer.write({ type: "text-delta", id: partId, delta });
+                  text += part.text;
+                  writer.write({ type: "text-delta", id: partId, delta: part.text });
+                }
+                if (!text.trim()) {
+                  throw new Error("Model returned an empty response.");
                 }
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
@@ -611,17 +677,22 @@ export const Route = createFileRoute("/api/chat")({
                 }
                 const creditsOrRateLimit = isCreditsOrRateLimitError(e);
                 console.error(
-                  `[chat] model stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
+                  `[chat] ${label} stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
                   e,
                 );
                 return { text, failed: true, creditsOrRateLimit };
               }
             }
 
+            const primaryCandidate: ModelCandidate = {
+              model: primaryModel,
+              label: primaryLabel,
+              modelId: primaryModelId,
+            };
             let primaryText = "";
             let primaryFailed = false;
             if (!preempt) {
-              const r = await runModel(primaryModel, system);
+              const r = await runModel(primaryCandidate, system);
               primaryText = r.text;
               primaryFailed = r.failed;
               if (!primaryFailed && primaryText) {
@@ -646,7 +717,7 @@ export const Route = createFileRoute("/api/chat")({
                 console.warn(
                   `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
                 );
-                const retry = await runModel(primaryModel, system + STRICT_DATE_RETRY_SUFFIX);
+                const retry = await runModel(primaryCandidate, system + STRICT_DATE_RETRY_SUFFIX);
                 if (!retry.failed && retry.text) {
                   didCalendarRetry = true;
                   const recheck = validateCalendarCitation({
@@ -674,14 +745,14 @@ export const Route = createFileRoute("/api/chat")({
             }
 
             const needFallback =
-              !!fallbackModel &&
+              fallbackCandidates.length > 0 &&
               (preempt || primaryFailed || looksLikeRefusal(primaryText));
 
             if (!needFallback) {
               // No fallback path. If primary itself failed and we have no
               // fallback, surface a single human-readable line instead of
               // the AI SDK's red error rendering.
-              if (primaryFailed && !fallbackModel) {
+              if (primaryFailed && fallbackCandidates.length === 0) {
                 const mid = crypto.randomUUID();
                 const pid = crypto.randomUUID();
                 writer.write({ type: "start", messageId: mid });
@@ -711,10 +782,18 @@ export const Route = createFileRoute("/api/chat")({
               return;
             }
 
-            // Fallback path. Stream the fallback as its own assistant message.
-            const fb = await runModel(fallbackModel!, system + FALLBACK_SYSTEM_SUFFIX);
-            let fbText = fb.text;
-            if (fb.failed && !fbText) {
+            // Fallback path. Try every configured candidate until one produces text.
+            let fbText = "";
+            let usedFallbackLabel: string | null = null;
+            for (const candidate of fallbackCandidates) {
+              const fb = await runModel(candidate, system + FALLBACK_SYSTEM_SUFFIX);
+              if (!fb.failed && fb.text) {
+                fbText = fb.text;
+                usedFallbackLabel = candidate.label;
+                break;
+              }
+            }
+            if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
               const mid = crypto.randomUUID();
               const pid = crypto.randomUUID();
@@ -722,7 +801,7 @@ export const Route = createFileRoute("/api/chat")({
               writer.write({ type: "start-step" });
               writer.write({ type: "text-start", id: pid });
               const delta =
-                "Both the primary model and the fallback are unavailable right now. Try again in a moment.";
+                "No configured model is available right now: Groq is rate-limited or exhausted, Venice is out of credits, OpenAI quota is exhausted, and/or Llama rejected its key. Check /api/health/ai, then top up or replace the bad key.";
               writer.write({ type: "text-delta", id: pid, delta });
               writer.write({ type: "text-end", id: pid });
               writer.write({ type: "finish-step" });
@@ -738,7 +817,7 @@ export const Route = createFileRoute("/api/chat")({
                 : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
               await persistAssistant(persistedFb, {
                 tier: "fallback",
-                fallback_catalog: fallbackLabel,
+                fallback_catalog: usedFallbackLabel,
               });
             }
 
