@@ -94,8 +94,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "DØ MØRE" },
       { property: "og:description", content: "DØ MØRE" },
       { name: "twitter:description", content: "DØ MØRE" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d3552985-cb31-46eb-ba05-74aa1a1f4682/id-preview-d088bc70--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782813387399.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/d3552985-cb31-46eb-ba05-74aa1a1f4682/id-preview-d088bc70--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782813387399.png" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
