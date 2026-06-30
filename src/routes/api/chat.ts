@@ -406,6 +406,16 @@ export const Route = createFileRoute("/api/chat")({
           console.warn("[chat] failed to persist debug payload:", e);
         }
 
+        // Shared key bundle for every resolveProvider() call.
+        const providerKeys = {
+          openaiApiKey: process.env.OPENAI_API_KEY,
+          groqApiKey: process.env.GROQ_API_KEY,
+          llamaApiKey: process.env.LLAMA_API_KEY,
+          veniceApiKey: process.env.VENICE_API_KEY,
+          geminiApiKey: process.env.GEMINI_API_KEY,
+          openrouterApiKey: process.env.OPENROUTER_API_KEY,
+        };
+
         // Resolve primary provider
         type ChatModel = ReturnType<typeof resolveProvider>["model"];
         type ModelCandidate = { model: ChatModel; label: string; modelId: string };
@@ -413,13 +423,7 @@ export const Route = createFileRoute("/api/chat")({
         let primaryLabel = "primary";
         let primaryModelId = "";
         try {
-          const resolved = resolveProvider(cfg, {
-            openaiApiKey: process.env.OPENAI_API_KEY,
-            groqApiKey: process.env.GROQ_API_KEY,
-            llamaApiKey: process.env.LLAMA_API_KEY,
-            veniceApiKey: process.env.VENICE_API_KEY,
-            activeProvider,
-          });
+          const resolved = resolveProvider(cfg, { ...providerKeys, activeProvider });
           primaryModel = resolved.model;
           primaryLabel = resolved.providerName;
           primaryModelId = resolved.modelId;
@@ -429,7 +433,6 @@ export const Route = createFileRoute("/api/chat")({
             { status: 500 },
           );
         }
-
 
         // Resolve fallback providers (best-effort — never blocks primary).
         // One dead upstream should never make chat look dead; we walk every
@@ -444,25 +447,23 @@ export const Route = createFileRoute("/api/chat")({
           seenCandidates.add(key);
           fallbackCandidates.push(candidate);
         };
+
+        const builtinModelId = (kind: FbKind): string => {
+          switch (kind) {
+            case "venice": return "venice-uncensored";
+            case "groq": return "llama-3.3-70b-versatile";
+            case "llama": return "Llama-3.3-70B-Instruct";
+            case "gemini": return "gemini-2.5-flash";
+            case "openrouter": return "meta-llama/llama-3.3-70b-instruct";
+            case "openai": return "gpt-4o-mini";
+          }
+        };
+
         if (fallbackEnvKind) {
           try {
-            const fbModelId =
-              fallbackEnvKind === "venice"
-                ? "venice-uncensored"
-                : fallbackEnvKind === "groq"
-                  ? "llama-3.3-70b-versatile"
-                  : fallbackEnvKind === "llama"
-                    ? "Llama-3.3-70B-Instruct"
-                    : "gpt-4o-mini";
             const resolvedFb = resolveProvider(
-              { ...cfg, provider: fallbackEnvKind, model: fbModelId },
-              {
-                openaiApiKey: process.env.OPENAI_API_KEY,
-                groqApiKey: process.env.GROQ_API_KEY,
-                llamaApiKey: process.env.LLAMA_API_KEY,
-                veniceApiKey: process.env.VENICE_API_KEY,
-                activeProvider: null,
-              },
+              { ...cfg, provider: fallbackEnvKind, model: builtinModelId(fallbackEnvKind) },
+              { ...providerKeys, activeProvider: null },
             );
             addFallbackCandidate({
               model: resolvedFb.model,
@@ -476,13 +477,7 @@ export const Route = createFileRoute("/api/chat")({
           try {
             const resolvedFb = resolveProvider(
               { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
-              {
-                openaiApiKey: process.env.OPENAI_API_KEY,
-                groqApiKey: process.env.GROQ_API_KEY,
-                llamaApiKey: process.env.LLAMA_API_KEY,
-                veniceApiKey: process.env.VENICE_API_KEY,
-                activeProvider: fallbackProvider,
-              },
+              { ...providerKeys, activeProvider: fallbackProvider },
             );
             addFallbackCandidate({
               model: resolvedFb.model,
@@ -494,29 +489,12 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        const builtinModelId = (kind: "groq" | "openai" | "llama" | "venice") =>
-          kind === "venice"
-            ? "venice-uncensored"
-            : kind === "groq"
-              ? "llama-3.3-70b-versatile"
-              : kind === "llama"
-                ? "Llama-3.3-70B-Instruct"
-                : "gpt-4o-mini";
-        const addBuiltinFallback = (kind: "groq" | "openai" | "llama" | "venice") => {
-          if (kind === "groq" && !process.env.GROQ_API_KEY) return;
-          if (kind === "openai" && !process.env.OPENAI_API_KEY) return;
-          if (kind === "venice" && !process.env.VENICE_API_KEY) return;
-          if (kind === "llama" && !process.env.LLAMA_API_KEY) return;
+        const addBuiltinFallback = (kind: FbKind) => {
+          if (!FB_ENV[kind]) return;
           try {
             const resolved = resolveProvider(
               { ...cfg, provider: kind, model: builtinModelId(kind) },
-              {
-                openaiApiKey: process.env.OPENAI_API_KEY,
-                groqApiKey: process.env.GROQ_API_KEY,
-                llamaApiKey: process.env.LLAMA_API_KEY,
-                veniceApiKey: process.env.VENICE_API_KEY,
-                activeProvider: null,
-              },
+              { ...providerKeys, activeProvider: null },
             );
             addFallbackCandidate({
               model: resolved.model,
@@ -527,7 +505,12 @@ export const Route = createFileRoute("/api/chat")({
             /* ignore unavailable automatic fallback */
           }
         };
-        (["groq", "openai", "venice", "llama"] as const).forEach(addBuiltinFallback);
+        // Walk order: free/fast first → broad catalog → paid → uncensored.
+        (["groq", "gemini", "openrouter", "openai", "venice", "llama"] as const).forEach(
+          addBuiltinFallback,
+        );
+
+
 
 
         // Save the user message now (before streaming) so it shows up even
