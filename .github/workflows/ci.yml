@@ -2,40 +2,49 @@ name: ci
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 jobs:
   audit:
-    name: Brand + icon audits
+    name: Brand + icon audits (end-to-end)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
+
       # Source-level audits — pure-Node, no install needed.
-      - name: Brand audit (no stray "Mement0", every product meta uses MementØ)
+      - name: Brand audit (no stray "Mement0")
         run: node scripts/audit-branding.mjs
       - name: Icon audit — source references (__root.tsx)
         run: node scripts/audit-icons.mjs
+      - name: Share-image test — og:image + twitter:image must be 1 local /public ref
+        run: node scripts/test-share-images.mjs
       - name: Manifest audit — public/manifest.webmanifest
         run: node scripts/audit-manifest.mjs
 
-      # Build the app once and reuse the output for the dist + playwright checks.
       - name: Install deps
         run: bun install --frozen-lockfile
-      - name: Build
+
+      # Clean any cached/generated artifacts before the prod build so stale
+      # metadata (.output, .nitro, dist, vite cache) can never be reused.
+      - name: Clean build artifacts
+        run: bun run clean
+      - name: Build (production)
         run: bun run vite build
+
       - name: Icon audit — built bundle (.output/public / dist)
         run: node scripts/audit-dist-icons.mjs
       - name: Manifest audit — built bundle
         run: node scripts/audit-manifest.mjs
+      - name: Share-image test — post-build re-check
+        run: node scripts/test-share-images.mjs
 
       # Playwright end-to-end checks against the running preview.
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
-      - name: Icon playwright check (200 + content-type + dimensions, incl. LinkedIn/social cards)
+      - name: Icon playwright check (200 + content-type + dimensions, incl. social cards)
         run: node scripts/check-icons-playwright.mjs
       - name: Amber/ember CSS audit (rendered homepage)
         run: node scripts/check-amber-playwright.mjs
