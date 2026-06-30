@@ -254,12 +254,59 @@ export const Route = createFileRoute("/api/chat")({
           ? `STALE_OPEN=true. This thread was abandoned ${Math.round(idleMs / 3_600_000)}h ago with unresolved material${contThread?.continuity_note ? ` (note: ${contThread.continuity_note})` : ""}. Lead the next assistant turn with a direct, blunt check-in that references the unresolved thread — no greeting, no preamble.`
           : `STALE_OPEN=false. status=${contThread?.continuity_status ?? "open"}.`;
 
+        // TIME CONTEXT — the model has no clock and no sense of how long
+        // it's been between turns. We hand it (a) the user's actual local
+        // wall-clock time in their IANA zone, (b) the Pacific Time anchor
+        // for the product, and (c) the literal delta since the last message
+        // in this thread so it stops hallucinating "earlier today" /
+        // "5 minutes ago" / "3 AM" guesses.
+        const nowDate = new Date();
+        const fmt = (tz: string, opts: Intl.DateTimeFormatOptions) => {
+          try {
+            return new Intl.DateTimeFormat("en-US", { ...opts, timeZone: tz }).format(nowDate);
+          } catch {
+            return nowDate.toISOString();
+          }
+        };
+        const tzOpts: Intl.DateTimeFormatOptions = {
+          weekday: "short",
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          timeZoneName: "short",
+          hour12: true,
+        };
+        const userLocalStr = fmt(userTz, tzOpts);
+        const pacificStr = fmt("America/Los_Angeles", tzOpts);
+        const idleHuman =
+          idleMs > 0
+            ? idleMs < 60_000
+              ? `${Math.round(idleMs / 1000)}s`
+              : idleMs < 3_600_000
+                ? `${Math.round(idleMs / 60_000)}m`
+                : idleMs < 86_400_000
+                  ? `${Math.round(idleMs / 3_600_000)}h`
+                  : `${Math.round(idleMs / 86_400_000)}d`
+            : "first message";
+        const timeBlock = [
+          `UTC_NOW=${nowDate.toISOString()}`,
+          `USER_LOCAL=${userLocalStr} (${userTz})`,
+          `PACIFIC_ANCHOR=${pacificStr} (America/Los_Angeles)`,
+          `SINCE_LAST_MESSAGE=${idleHuman}`,
+          `RULES: Always reason about time using USER_LOCAL — that is the wall-clock the user is actually living in. Mement0's house zone is Pacific; use PACIFIC_ANCHOR only when the user explicitly asks about Pacific time, scheduling with the product team, or product-side events. Never invent a time, never assume "morning"/"night" from training defaults, and use SINCE_LAST_MESSAGE for accurate "X ago" phrasing instead of guessing.`,
+        ].join("\n");
+
         const baseSystem = settings?.system_prompt_override?.trim() || DED_PERSONA;
         const personalityBlock = await buildPersonalityBlock(supabase, userId);
         const system = [
           baseSystem,
           "",
           personalityBlock,
+          "",
+          "### TIME CONTEXT",
+          timeBlock,
           "",
           "### RETRIEVED MEMORY CONTEXT",
           memoryBlock || "(no relevant memories retrieved)",
