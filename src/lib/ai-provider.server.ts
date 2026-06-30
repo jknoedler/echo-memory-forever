@@ -117,10 +117,10 @@ function autoPick(cfg: UserAiConfig, opts: ResolveOpts): ResolvedProvider {
   const looksHostedGateway = m.includes("/"); // "google/gemini-...", "openai/gpt-..."
   const passModel = !looksHostedGateway ? m || undefined : undefined;
 
-  // Order: cheapest/free first → broad catalog → paid → uncensored.
-  // Llama (free) → Groq (free) → OpenRouter (broad, cheap) → Gemini (free
-  // tier) → Venice (uncensored, paid) → OpenAI (paid).
-  const order: BuiltinKind[] = ["llama", "groq", "openrouter", "gemini", "venice", "openai"];
+  // Order: stable hosted routes first → direct Meta Llama later.
+  // Direct Llama keys have proven prone to intermittent 401s, so don't let
+  // that key be the first thing Auto relies on when Groq/OpenRouter/Gemini are healthy.
+  const order: BuiltinKind[] = ["groq", "openrouter", "gemini", "llama", "venice", "openai"];
   for (const kind of order) {
     const key = pickKey(kind, opts);
     if (key) return buildBuiltin(kind, key, passModel);

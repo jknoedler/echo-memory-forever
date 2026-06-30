@@ -40,7 +40,7 @@ export function ChatSettings({
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const fallbackM = useMutation({
-    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | null }) =>
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | "gemini" | "openrouter" | null }) =>
       updateMySettings({
         data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
       }),
@@ -154,32 +154,44 @@ export function ChatSettings({
                       ? "env:venice"
                       : settingsQ.data?.fallback_provider_kind === "groq"
                         ? "env:groq"
-                        : settingsQ.data?.fallback_provider_kind === "openai"
-                          ? "env:openai"
-                          : settingsQ.data?.fallback_provider_kind === "llama"
-                            ? "env:llama"
-                            : settingsQ.data?.fallback_provider_id ?? ""
+                      : settingsQ.data?.fallback_provider_kind === "openrouter"
+                        ? "env:openrouter"
+                        : settingsQ.data?.fallback_provider_kind === "gemini"
+                          ? "env:gemini"
+                          : settingsQ.data?.fallback_provider_kind === "openai"
+                            ? "env:openai"
+                            : settingsQ.data?.fallback_provider_kind === "llama"
+                              ? "env:llama"
+                              : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "env:venice") fallbackM.mutate({ id: null, kind: "venice" });
                     else if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
+                    else if (v === "env:openrouter") fallbackM.mutate({ id: null, kind: "openrouter" });
+                    else if (v === "env:gemini") fallbackM.mutate({ id: null, kind: "gemini" });
                     else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
                     else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
                   <option value="">
-                    {envQ.data?.venice ? "Auto (Venice — default)" : "Off"}
+                    {envQ.data?.groq || envQ.data?.openrouter || envQ.data?.gemini ? "Auto (Groq/OpenRouter/Gemini)" : "Off"}
                   </option>
-                  {envQ.data?.venice && (
-                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
-                  )}
-                  {envQ.data?.llama && (
-                    <option value="env:llama">Llama (project key) · Llama 3.3 70B</option>
-                  )}
                   {envQ.data?.groq && (
                     <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
+                  )}
+                  {envQ.data?.openrouter && (
+                    <option value="env:openrouter">OpenRouter (project key) · Llama 3.3 70B</option>
+                  )}
+                  {envQ.data?.gemini && (
+                    <option value="env:gemini">Gemini (project key) · 2.5 Flash</option>
+                  )}
+                  {envQ.data?.llama && (
+                    <option value="env:llama">Direct Llama (project key) · can 401</option>
+                  )}
+                  {envQ.data?.venice && (
+                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
                   )}
                   {envQ.data?.openai && (
                     <option value="env:openai">OpenAI (project key) · gpt-4o-mini</option>
@@ -215,7 +227,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "gemini" | "openrouter" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
