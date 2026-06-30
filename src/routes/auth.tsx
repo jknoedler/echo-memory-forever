@@ -6,7 +6,7 @@ import { lovable } from "@/integrations/lovable";
 import { Mement0Hero } from "@/components/mement0-logo";
 
 export const Route = createFileRoute("/auth")({
-  head: () => ({ meta: [{ title: "Sign in — Mement0" }] }),
+  head: () => ({ meta: [{ title: "Sign in — MementØ" }] }),
   component: AuthPage,
 });
 

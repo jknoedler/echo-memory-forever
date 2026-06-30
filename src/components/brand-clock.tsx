@@ -56,7 +56,7 @@ export function BrandClock({ className = "" }: { className?: string }) {
       title={
         sameZone
           ? `Pacific Time · ${tz}`
-          : `Your local time (${tz}). Mement0 is anchored to Pacific Time: ${pacific}.`
+          : `Your local time (${tz}). MementØ is anchored to Pacific Time: ${pacific}.`
       }
       aria-label={`Current time ${userLocal}`}
     >
