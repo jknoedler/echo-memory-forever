@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Brain, Database, Infinity as InfinityIcon, Lock, Radio, ShieldCheck } from "lucide-react";
-import { Mement0Logo } from "@/components/mement0-logo";
+import { Mement0Logo, Mement0Wordmark } from "@/components/mement0-logo";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
