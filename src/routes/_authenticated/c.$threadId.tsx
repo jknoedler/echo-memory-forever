@@ -59,7 +59,12 @@ function ChatPage() {
     supabase.auth.getSession().then(({ data }) => {
       setToken(data.session?.access_token ?? null);
     });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      setToken(session?.access_token ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
+
 
   const historyQ = useQuery({
     queryKey: ["messages", threadId],
@@ -97,11 +102,18 @@ function ChatWindow({
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
-        headers: { Authorization: `Bearer ${token}` },
+        // Fetch a fresh access token on every send. Supabase tokens expire
+        // after ~1h; capturing once on mount caused 401s mid-conversation.
+        headers: async () => {
+          const { data } = await supabase.auth.getSession();
+          const t = data.session?.access_token ?? token;
+          return { Authorization: `Bearer ${t}` };
+        },
         body: { threadId },
       }),
     [threadId, token],
   );
+
 
   const { messages, sendMessage, status, error } = useChat({
     id: threadId,
