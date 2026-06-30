@@ -41,6 +41,36 @@ export type Database = {
         }
         Relationships: []
       }
+      events: {
+        Row: {
+          all_day: boolean
+          created_at: string
+          id: string
+          notes: string | null
+          occurred_at: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          all_day?: boolean
+          created_at?: string
+          id?: string
+          notes?: string | null
+          occurred_at: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          all_day?: boolean
+          created_at?: string
+          id?: string
+          notes?: string | null
+          occurred_at?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       memories: {
         Row: {
           content: string
