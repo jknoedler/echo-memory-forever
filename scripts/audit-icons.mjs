@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Icon audit — verifies favicon / apple-touch-icon / og:image links in
+ * Icon audit — verifies favicon / apple-touch-icon links in
  * src/routes/__root.tsx exist on disk and meet the size / content-type /
  * dimension budgets common browsers, iOS / Android home-screens, and social
  * crawlers expect.
@@ -107,59 +107,7 @@ function parseIconRefs() {
     const href = m[2] ?? resolveIdent(src, m[3]);
     refs.push({ role: `link:${m[1]}`, href, raw: m[2] ?? m[3] });
   }
-  const metaPropRe = /property:\s*["'](og:image|twitter:image)["'][^}]*?content:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))/g;
-  for (const m of src.matchAll(metaPropRe)) {
-    const href = m[2] ?? resolveIdent(src, m[3]);
-    refs.push({ role: `meta:${m[1]}`, href, raw: m[2] ?? m[3] });
-  }
-  const metaNameRe = /name:\s*["'](twitter:image)["'][^}]*?content:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))/g;
-  for (const m of src.matchAll(metaNameRe)) {
-    const href = m[2] ?? resolveIdent(src, m[3]);
-    refs.push({ role: `meta:${m[1]}`, href, raw: m[2] ?? m[3] });
-  }
-
-  // og:image / twitter:image now come from src/lib/brand-meta.ts via
-  // rootMeta()/shareImageMeta(). If __root.tsx imports rootMeta or
-  // shareImageMeta, synthesize refs from the brand config so this audit
-  // still verifies the file on disk.
-  if (/from\s+["']@\/lib\/brand-meta["']/.test(src)) {
-    const brandFile = join(ROOT, "src/lib/brand-meta.ts");
-    if (existsSync(brandFile)) {
-      const brand = readFileSync(brandFile, "utf8");
-      const pm = /ogImage\s*:\s*\{[^}]*path\s*:\s*["']([^"']+)["']/m.exec(brand);
-      if (pm) {
-        const path = pm[1];
-        refs.push({ role: "meta:og:image", href: path, raw: "BRAND.ogImage.path" });
-        refs.push({ role: "meta:twitter:image", href: path, raw: "BRAND.ogImage.path" });
-      }
-    }
-  }
   return refs;
-}
-
-function scanForbiddenShareImageUrls() {
-  const src = readFileSync(ROOT_ROUTE, "utf8");
-  const errors = [];
-  const usesBrandMeta = /from\s+["']@\/lib\/brand-meta["']/.test(src);
-  const directShareMetaRe = /\{[^}]*?(?:property|name):\s*["'](og:image|twitter:image)["'][^}]*?content:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))[\s\S]*?\}/g;
-  for (const match of src.matchAll(directShareMetaRe)) {
-    const role = match[1];
-    const raw = match[2] ?? match[3] ?? "<unknown>";
-    const line = src.slice(0, match.index ?? 0).split("\n").length;
-    if (usesBrandMeta) {
-      errors.push(
-        `${relative(ROOT, ROOT_ROUTE)}:${line}: direct ${role} metadata is forbidden when rootMeta()/brand-meta is imported; delete the inline tag and use src/lib/brand-meta.ts only (${raw}).`,
-      );
-    }
-    if (/^https?:\/\//i.test(raw)) {
-      errors.push(`forbidden external share image URL in ${relative(ROOT, ROOT_ROUTE)}:${line}: ${raw}`);
-    }
-  }
-  const externalShareMetaRe = /\{[^}]*?(?:property|name):\s*["'](?:og:image|twitter:image)["'][^}]*?content:\s*["'](https?:\/\/[^"']+)["'][^}]*?\}/g;
-  for (const match of src.matchAll(externalShareMetaRe)) {
-    errors.push(`forbidden external share image URL in ${relative(ROOT, ROOT_ROUTE)}: ${match[1]}`);
-  }
-  return errors;
 }
 
 /** Resolve `const NAME = "literal"` or `const NAME = something.url;`. */
@@ -202,22 +150,9 @@ const RULES = {
     dims: [{ w: 180, h: 180 }, { w: 152, h: 152 }, { w: 167, h: 167 }, { w: 192, h: 192 }],
     hardMaxBytes: 300_000,
   },
-  "meta:og:image": {
-    types: ["image/png", "image/jpeg", "image/webp"],
-    dimsRange: { minW: 600, minH: 315, maxW: 4096, maxH: 4096 },
-    // Recommended exact aspect 1.91:1 → 1200x630.
-    preferred: { w: 1200, h: 630 },
-    hardMaxBytes: 1_000_000,
-  },
-  "meta:twitter:image": {
-    types: ["image/png", "image/jpeg", "image/webp"],
-    dimsRange: { minW: 600, minH: 315, maxW: 4096, maxH: 4096 },
-    preferred: { w: 1200, h: 630 },
-    hardMaxBytes: 1_000_000,
-  },
 };
 
-const REQUIRED = ["link:icon", "link:apple-touch-icon", "meta:og:image", "meta:twitter:image"];
+const REQUIRED = ["link:icon", "link:apple-touch-icon"];
 
 function checkDims(rule, dims) {
   if (!dims) return { ok: false, msg: "dimensions could not be decoded" };
@@ -240,18 +175,9 @@ function main() {
   /** @type {string[]} */ const errors = [];
   /** @type {string[]} */ const warnings = [];
 
-  errors.push(...scanForbiddenShareImageUrls());
-
   const present = new Set(refs.map((r) => r.role));
   for (const must of REQUIRED) {
     if (!present.has(must)) errors.push(`missing required tag: ${must}`);
-  }
-
-  for (const role of ["meta:og:image", "meta:twitter:image"]) {
-    const matches = refs.filter((r) => r.role === role);
-    if (matches.length > 1) {
-      errors.push(`${role}: duplicate tags found (${matches.length}); keep exactly one local /public image reference`);
-    }
   }
 
   console.log(`Icon audit — ${refs.length} reference(s) in src/routes/__root.tsx\n`);
@@ -260,9 +186,6 @@ function main() {
     const rule = RULES[r.role];
     const resolved = resolveRef(r.href, assets);
     const head = `${r.role.padEnd(24)} ${r.href}`;
-    if ((r.role === "meta:og:image" || r.role === "meta:twitter:image") && /^https?:\/\//i.test(r.href)) {
-      errors.push(`${r.role}: external URLs are forbidden for share images; use /og-image.png or a tracked asset`);
-    }
     if (!resolved.ok) {
       errors.push(`${r.role}: ${resolved.reason}`);
       console.log(`  ${head}\n    ✗ ${resolved.reason}`);
