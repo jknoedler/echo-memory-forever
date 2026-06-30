@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Sun, Moon, Monitor, Check, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { useTheme, type ThemeMode } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
@@ -32,7 +32,7 @@ export function ChatSettings({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { mode, setMode, bgPalette, accentPalette, setBgPalette, setAccentPalette } = useTheme();
+  const { bgPalette, accentPalette, setBgPalette, setAccentPalette } = useTheme();
   const qc = useQueryClient();
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
@@ -60,11 +60,6 @@ export function ChatSettings({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  const themes: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
-    { id: "light", label: "Light", icon: <Sun className="h-3.5 w-3.5" /> },
-    { id: "dark", label: "Dark", icon: <Moon className="h-3.5 w-3.5" /> },
-    { id: "system", label: "Auto", icon: <Monitor className="h-3.5 w-3.5" /> },
-  ];
 
   return (
     <div className="relative" ref={ref}>
