@@ -115,7 +115,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <>
         <div className="p-4 border-b border-border flex items-center justify-between">
-          <Mement0Logo to="/app" />
+          <div
+            className="rounded-md"
+            style={{
+              filter:
+                "drop-shadow(0 0 6px color-mix(in oklab, var(--primary) 70%, transparent)) drop-shadow(0 0 14px color-mix(in oklab, var(--primary) 35%, transparent))",
+            }}
+          >
+            <Mement0Logo to="/app" />
+          </div>
           <button
             type="button"
             onClick={() => {

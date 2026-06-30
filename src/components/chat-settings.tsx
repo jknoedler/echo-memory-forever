@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Settings as SettingsIcon, Sun, Moon, Monitor, Check, ExternalLink } from "lucide-react";
+import { Settings as SettingsIcon, Check, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
-import { useTheme, type ThemeMode } from "@/lib/theme";
+import { useTheme } from "@/lib/theme";
 import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
@@ -32,7 +32,7 @@ export function ChatSettings({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  const { mode, setMode, bgPalette, accentPalette, setBgPalette, setAccentPalette } = useTheme();
+  const { bgPalette, accentPalette, setBgPalette, setAccentPalette } = useTheme();
   const qc = useQueryClient();
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
@@ -60,11 +60,6 @@ export function ChatSettings({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
 
-  const themes: { id: ThemeMode; label: string; icon: React.ReactNode }[] = [
-    { id: "light", label: "Light", icon: <Sun className="h-3.5 w-3.5" /> },
-    { id: "dark", label: "Dark", icon: <Moon className="h-3.5 w-3.5" /> },
-    { id: "system", label: "Auto", icon: <Monitor className="h-3.5 w-3.5" /> },
-  ];
 
   return (
     <div className="relative" ref={ref}>
@@ -79,32 +74,10 @@ export function ChatSettings({
       {open && (
         <div className="absolute right-0 top-9 z-50 w-72 rounded-lg border border-border bg-popover p-3 shadow-xl">
           <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-            Theme
-          </p>
-          <div className="grid grid-cols-3 gap-1">
-            {themes.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                onClick={() => setMode(t.id)}
-                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-xs transition-colors ${
-                  mode === t.id
-                    ? "border-primary/60 bg-primary/10 text-foreground"
-                    : "border-border text-muted-foreground hover:bg-secondary"
-                }`}
-              >
-                {t.icon}
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="my-3 h-px bg-border" />
-
-          <p className="px-1 pb-2 text-[10px] uppercase tracking-widest text-muted-foreground">
             Background
           </p>
-          <div className="grid grid-cols-8 gap-1.5 px-1">
+          <div className="grid grid-cols-3 gap-1.5 px-1">
+
             {BG_PALETTES.map((p) => (
               <button
                 key={p.id}
@@ -112,11 +85,18 @@ export function ChatSettings({
                 onClick={() => setBgPalette(p.id)}
                 title={p.label}
                 aria-label={`Background ${p.label}`}
-                className={`h-6 w-6 rounded-full border transition-transform hover:scale-110 ${
-                  bgPalette === p.id ? "border-primary ring-2 ring-primary/40" : "border-border"
+                className={`flex flex-col items-center gap-1 rounded-md border px-2 py-2 text-[11px] transition-colors ${
+                  bgPalette === p.id
+                    ? "border-primary/60 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-secondary"
                 }`}
-                style={{ background: p.swatch }}
-              />
+              >
+                <span
+                  className="h-5 w-5 rounded-full border border-border"
+                  style={{ background: p.swatch }}
+                />
+                {p.label}
+              </button>
             ))}
           </div>
 
