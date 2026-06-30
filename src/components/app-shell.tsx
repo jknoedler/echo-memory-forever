@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, ChevronLeft, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Brain, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
 import { BrandClock } from "@/components/brand-clock";
@@ -217,6 +217,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="border-t border-border p-2 space-y-0.5">
           <NavItem to="/tasks" icon={<ClipboardList className="h-4 w-4" />} label="Staged tasks" onClick={onNavigate} />
+          <NavItem to="/events" icon={<CalendarDays className="h-4 w-4" />} label="Calendar" onClick={onNavigate} />
           <NavItem to="/personality" icon={<Brain className="h-4 w-4" />} label="Personality" onClick={onNavigate} />
           <NavItem to="/library" icon={<Library className="h-4 w-4" />} label="Model library" onClick={onNavigate} />
           <NavItem to="/settings" icon={<SettingsIcon className="h-4 w-4" />} label="Settings" onClick={onNavigate} />
