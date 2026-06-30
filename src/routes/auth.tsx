@@ -144,6 +144,16 @@ function AuthPage() {
               />
             </Field>
 
+            <label className="flex items-center gap-2 text-xs text-muted-foreground select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={stayLoggedIn}
+                onChange={(e) => setStayLoggedIn(e.target.checked)}
+                className="h-4 w-4 accent-primary cursor-pointer"
+              />
+              Stay logged in
+            </label>
+
             <button
               type="submit"
               disabled={busy}
@@ -152,6 +162,7 @@ function AuthPage() {
               {busy ? "…" : mode === "signup" ? "Create archive" : "Open archive"}
             </button>
           </form>
+
 
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
