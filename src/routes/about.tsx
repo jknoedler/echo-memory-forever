@@ -72,7 +72,7 @@ function About() {
             icon={<Brain className="h-5 w-5" />}
             kicker="Persona"
             title="It mirrors you"
-            body="No two Mement0s are alike. The bot calibrates to your cadence, your humor, your risks. A confidant — never a moralizer."
+            body="No two MementØs are alike. The bot calibrates to your cadence, your humor, your risks. A confidant — never a moralizer."
           />
           <Promise
             icon={<ShieldCheck className="h-5 w-5" />}
@@ -91,7 +91,7 @@ function About() {
               Model-agnostic by design.
             </h2>
             <p className="mt-4 text-muted-foreground">
-              Mement0 is not loyal to any model. Runs on Claude by default. Bring your
+              MementØ is not loyal to any model. Runs on Claude by default. Bring your
               own OpenAI, Anthropic, OpenRouter key. Or point it at a self-hosted llama running on
               your own machine. The brain swaps. The memory stays.
             </p>
@@ -115,7 +115,7 @@ function About() {
         <div className="mx-auto max-w-4xl px-5 py-24 text-center">
           <p className="text-xs uppercase tracking-widest text-primary">Legacy</p>
           <h2 className="mt-3 text-4xl md:text-5xl font-display font-semibold tracking-tight">
-            Mement0's memory doesn't.
+            MementØ's memory doesn't.
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
             Make sure your memories live on endlessly. Be there for your loved ones long after you pass.
@@ -130,7 +130,7 @@ function About() {
           An AI that grows with you.
         </h2>
         <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
-          Start young. Let your kids learn to read from their agentic AI. Let Mement0 be their first
+          Start young. Let your kids learn to read from their agentic AI. Let MementØ be their first
           and best teacher. The model grows with the child, learns from them, evolves with them,
           matures with them — and your child has a lifelong companion who knows them better than anyone
           and is always there, through thick and thin.
@@ -149,7 +149,7 @@ function About() {
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground leading-relaxed">
             Unlike other AI, we do not forget. All of your memories, all of your work, forever.
-            Remember that project you did last fall for two days before Thanksgiving? Mement0 remembers MORE.
+            Remember that project you did last fall for two days before Thanksgiving? MementØ remembers MORE.
             It never forgets. It builds an archive of <em>you</em> in a way never possible before now.
           </p>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground leading-relaxed">
@@ -157,7 +157,7 @@ function About() {
             it is there, and it will not need you to explain the context repeatedly like current models.
           </p>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground leading-relaxed">
-            Mement0 is truly model-agnostic. It uses all major models and can be the controller for
+            MementØ is truly model-agnostic. It uses all major models and can be the controller for
             smaller self-hosted models like Llama. No judgment, no hallucination — it is always thinking
             about you, and only you.
           </p>
@@ -181,7 +181,7 @@ function About() {
       <footer className="border-t border-border">
         <div className="mx-auto max-w-6xl px-5 py-8 flex items-center justify-between text-xs text-muted-foreground">
           <Mement0Logo to="/" />
-          <span>© Mement0 — the eternal archive.</span>
+          <span>© MementØ — the eternal archive.</span>
         </div>
       </footer>
     </div>

@@ -139,7 +139,7 @@ function LibraryPage() {
         <section className="space-y-4">
           <h2 className="text-lg font-display font-semibold tracking-tight">Local runtimes</h2>
           <p className="text-sm text-muted-foreground -mt-2 max-w-2xl">
-            Mement0 can't install software on your machine from the browser. Install the
+            MementØ can't install software on your machine from the browser. Install the
             runtime once, copy the pull command for the model you want, then click
             "Connect" and we'll wire DED straight to localhost. Zero cloud, zero key.
           </p>

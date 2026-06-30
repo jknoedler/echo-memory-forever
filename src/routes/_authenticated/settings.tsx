@@ -107,7 +107,7 @@ function SettingsPage() {
           <h1 className="mt-1 text-3xl font-display tracking-tight">Settings</h1>
         </header>
 
-        <Card title="AI provider" subtitle="By default Mement0 routes through our included gateway — no API key needed from you. Switch to OpenAI Direct to use the project's OPENAI_API_KEY, or Custom to bring your own OpenAI-compatible endpoint (OpenRouter, Anthropic via proxy, Ollama, vLLM, self-hosted llama).">
+        <Card title="AI provider" subtitle="By default MementØ routes through our included gateway — no API key needed from you. Switch to OpenAI Direct to use the project's OPENAI_API_KEY, or Custom to bring your own OpenAI-compatible endpoint (OpenRouter, Anthropic via proxy, Ollama, vLLM, self-hosted llama).">
           <Field label="Provider" hint="Included = our gateway. OpenAI = direct via OPENAI_API_KEY. Custom = your own endpoint.">
             <select
               value={form.provider}

@@ -131,7 +131,7 @@ function Landing() {
 
       <footer className="px-5 py-5 flex items-center justify-center text-xs text-muted-foreground">
         <Link to="/about" className="hover:text-foreground transition-colors">
-          What is Mement0?
+          What is MementØ?
         </Link>
       </footer>
     </div>
