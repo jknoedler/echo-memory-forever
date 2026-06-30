@@ -129,10 +129,8 @@ function parseIconRefs() {
       const pm = /ogImage\s*:\s*\{[^}]*path\s*:\s*["']([^"']+)["']/m.exec(brand);
       if (pm) {
         const path = pm[1];
-        if (!refs.some((r) => r.role === "meta:og:image"))
-          refs.push({ role: "meta:og:image", href: path, raw: path });
-        if (!refs.some((r) => r.role === "meta:twitter:image"))
-          refs.push({ role: "meta:twitter:image", href: path, raw: path });
+        refs.push({ role: "meta:og:image", href: path, raw: "BRAND.ogImage.path" });
+        refs.push({ role: "meta:twitter:image", href: path, raw: "BRAND.ogImage.path" });
       }
     }
   }
@@ -142,6 +140,21 @@ function parseIconRefs() {
 function scanForbiddenShareImageUrls() {
   const src = readFileSync(ROOT_ROUTE, "utf8");
   const errors = [];
+  const usesBrandMeta = /from\s+["']@\/lib\/brand-meta["']/.test(src);
+  const directShareMetaRe = /\{[^}]*?(?:property|name):\s*["'](og:image|twitter:image)["'][^}]*?content:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))[\s\S]*?\}/g;
+  for (const match of src.matchAll(directShareMetaRe)) {
+    const role = match[1];
+    const raw = match[2] ?? match[3] ?? "<unknown>";
+    const line = src.slice(0, match.index ?? 0).split("\n").length;
+    if (usesBrandMeta) {
+      errors.push(
+        `${relative(ROOT, ROOT_ROUTE)}:${line}: direct ${role} metadata is forbidden when rootMeta()/brand-meta is imported; delete the inline tag and use src/lib/brand-meta.ts only (${raw}).`,
+      );
+    }
+    if (/^https?:\/\//i.test(raw)) {
+      errors.push(`forbidden external share image URL in ${relative(ROOT, ROOT_ROUTE)}:${line}: ${raw}`);
+    }
+  }
   const externalShareMetaRe = /\{[^}]*?(?:property|name):\s*["'](?:og:image|twitter:image)["'][^}]*?content:\s*["'](https?:\/\/[^"']+)["'][^}]*?\}/g;
   for (const match of src.matchAll(externalShareMetaRe)) {
     errors.push(`forbidden external share image URL in ${relative(ROOT, ROOT_ROUTE)}: ${match[1]}`);

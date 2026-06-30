@@ -1,24 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Brain, Database, Infinity as InfinityIcon, Lock, Radio, ShieldCheck } from "lucide-react";
 import { Mement0Logo, Mement0Wordmark } from "@/components/mement0-logo";
+import { BRAND, pageMeta } from "@/lib/brand-meta";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About — MementØ" },
-      {
-        name: "description",
-        content:
+      ...pageMeta({
+        title: "About — MementØ",
+        description:
           "MementØ is a lifelong, model-agnostic AI archive. MORE memory. 0 loss. Built to grow with you and outlive you.",
-      },
-      { property: "og:title", content: "About — MementØ" },
-      { property: "og:url", content: "https://mement0.com/about" },
-      {
-        property: "og:description",
-        content: "Lifelong AI archive. 0 loss memory. Agentic. Eternal.",
-      },
+        ogDescription: BRAND.shareDescription,
+        ogUrl: `${BRAND.domain}/about`,
+      }),
     ],
-    links: [{ rel: "canonical", href: "https://mement0.com/about" }],
+    links: [{ rel: "canonical", href: `${BRAND.domain}/about` }],
   }),
   component: About,
 });

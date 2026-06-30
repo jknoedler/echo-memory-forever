@@ -5,24 +5,19 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { createThread } from "@/lib/threads.functions";
 import { Mement0Logo, Mement0Hero } from "@/components/mement0-logo";
+import { BRAND, pageMeta } from "@/lib/brand-meta";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "MementØ — MORE / 0 loss" },
-      {
-        name: "description",
-        content:
-          "A lifelong AI memory and agentic OS. Lossless archive of your life. Model-agnostic.",
-      },
-      { property: "og:title", content: "MementØ — MORE / 0 loss" },
-      { property: "og:url", content: "https://mement0.com" },
-      {
-        property: "og:description",
-        content: "Lifelong AI archive. 0 loss memory. Agentic. Eternal.",
-      },
+      ...pageMeta({
+        title: BRAND.defaultTitle,
+        description: BRAND.defaultDescription,
+        ogDescription: BRAND.shareDescription,
+        ogUrl: BRAND.domain,
+      }),
     ],
-    links: [{ rel: "canonical", href: "https://mement0.com" }],
+    links: [{ rel: "canonical", href: BRAND.domain }],
   }),
   component: Landing,
 });

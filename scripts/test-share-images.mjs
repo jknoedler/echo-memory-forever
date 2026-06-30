@@ -7,15 +7,14 @@
  *   1. The brand config (src/lib/brand-meta.ts) declares ONE og image path,
  *      and that path resolves to a real file under public/.
  *
- *   2. No route file (src/routes/**.tsx) and no shared meta helper may
- *      reference an external http(s) URL in an og:image or twitter:image
- *      meta entry. These tags MUST come from brand-meta.ts and be local
- *      /public paths.
+ *   2. No source file except src/lib/brand-meta.ts may define an og:image
+ *      or twitter:image meta object. Routes use helpers; they never inline
+ *      share-image tags.
  *
  *   3. No og:image / twitter:image literal in any source file may point to
  *      an external URL. Catches accidental pastes of preview URLs.
  *
- * Failure prints exact remediation steps so the build error is actionable.
+ * Failure prints exact file + line remediation so the build error is actionable.
  */
 import { readFileSync, existsSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
@@ -25,7 +24,12 @@ const PUBLIC_DIR = join(ROOT, "public");
 const BRAND_FILE = join(ROOT, "src/lib/brand-meta.ts");
 const SRC = join(ROOT, "src");
 
+/** @type {string[]} */
 const errors = [];
+
+function lineOf(text, index) {
+  return text.slice(0, index).split("\n").length;
+}
 
 // ── Rule 1: brand-meta.ts ogImage.path must exist in public/ ───────────────
 if (!existsSync(BRAND_FILE)) {
@@ -63,10 +67,9 @@ if (!existsSync(BRAND_FILE)) {
 // ── Rule 2 + 3: scan source tree for forbidden patterns ────────────────────
 const EXT = /\.(tsx?|mts|cts)$/;
 const skip = new Set(["node_modules", "dist", ".output", ".nitro", ".vite", "routeTree.gen.ts"]);
-// Match meta entry that declares og:image or twitter:image (any role suffix)
-// together with its content value on the same object literal.
-const SHARE_META_RE =
-  /\{\s*(?:property|name)\s*:\s*["'](og:image(?::[a-z]+)?|twitter:image)["']\s*,\s*content\s*:\s*([^,}]+?)\s*\}/g;
+const SHARE_KEY_RE = /(?:property|name)\s*:\s*["'](og:image(?::[a-z]+)?|twitter:image(?::src)?)["']/;
+const SHARE_OBJECT_RE = /\{[\s\S]{0,700}?(?:property|name)\s*:\s*["'](og:image(?::[a-z]+)?|twitter:image(?::src)?)["'][\s\S]{0,700}?\}/g;
+const CONTENT_RE = /content\s*:\s*(["'`])([^"'`]+)\1/;
 
 function walk(dir) {
   for (const entry of readdirSync(dir)) {
@@ -76,33 +79,40 @@ function walk(dir) {
     if (st.isDirectory()) { walk(full); continue; }
     if (!EXT.test(entry)) continue;
     const rel = relative(ROOT, full).replaceAll("\\", "/");
-    if (rel.endsWith("brand-meta.ts")) continue; // canonical source
+    const isBrandMeta = rel === "src/lib/brand-meta.ts";
     if (rel.endsWith("test-share-images.mjs")) continue;
     const text = readFileSync(full, "utf8");
 
-    // Forbid literal external URLs in og:image / twitter:image entries.
-    for (const m of text.matchAll(SHARE_META_RE)) {
-      const raw = m[2].trim();
-      const literal = raw.match(/^["'`](.+)["'`]$/);
-      const val = literal ? literal[1] : raw;
-      if (/^https?:\/\//i.test(val)) {
-        errors.push(
-          `${rel}: ${m[1]} points to an external URL (${val}). Remove it — share images come from src/lib/brand-meta.ts.`,
-        );
-      } else if (literal && !val.startsWith("/")) {
-        errors.push(
-          `${rel}: ${m[1]} must be a local /public path, got '${val}'.`,
-        );
-      }
+    // Brand meta is the one legal definition point. It is validated above.
+    if (isBrandMeta) continue;
+
+    // Any inline share-image object outside brand-meta is a regression. This
+    // catches both local and external values so routes cannot drift from the
+    // shared helper again.
+    for (const m of text.matchAll(SHARE_OBJECT_RE)) {
+      const block = m[0];
+      const role = m[1];
+      const content = CONTENT_RE.exec(block)?.[2];
+      const line = lineOf(text, m.index ?? 0);
+      errors.push(
+        `${rel}:${line}: inline ${role} metadata is forbidden${content ? ` (${content})` : ""}. Use rootMeta()/shareImageMeta() from src/lib/brand-meta.ts only.`,
+      );
     }
 
-    // Catch raw https URLs sitting near an og:image / twitter:image key.
-    const adjacent = /(og:image(?::[a-z]+)?|twitter:image)["'][^}]{0,160}https?:\/\/[^"'\s}]+/g;
-    let a;
-    while ((a = adjacent.exec(text)) !== null) {
-      errors.push(
-        `${rel}: external URL adjacent to ${a[1]} — only /public paths via brand-meta.ts are allowed.`,
-      );
+    // Catch raw external URLs sitting in the same nearby chunk as a share key,
+    // even if the object format changes or the tag is malformed.
+    for (let i = 0; i < text.length; i += 1) {
+      const next = text.slice(i).search(SHARE_KEY_RE);
+      if (next === -1) break;
+      const keyIndex = i + next;
+      const chunk = text.slice(keyIndex, keyIndex + 700);
+      const external = chunk.match(/https?:\/\/[^"'\s},)]+/i)?.[0];
+      if (external) {
+        errors.push(
+          `${rel}:${lineOf(text, keyIndex)}: external share-image URL near ${SHARE_KEY_RE.exec(chunk)?.[1] ?? "share image"} (${external}). Share images must come from src/lib/brand-meta.ts and be local /public paths.`,
+        );
+      }
+      i = keyIndex + 1;
     }
   }
 }
@@ -113,8 +123,8 @@ if (errors.length) {
   for (const e of errors) console.error("  - " + e);
   console.error("\nHow to fix:");
   console.error("  1. Edit src/lib/brand-meta.ts → BRAND.ogImage.path to a local /public file.");
-  console.error("  2. Do NOT set og:image / twitter:image inline in any route — they come from rootMeta()/shareImageMeta() in brand-meta.ts.");
-  console.error("  3. Remove any external http(s) URL from share-image meta entries.");
+  console.error("  2. Delete inline og:image / twitter:image objects from routes and root metadata.");
+  console.error("  3. Use rootMeta()/shareImageMeta() from src/lib/brand-meta.ts; never paste preview/R2 URLs.");
   console.error("  4. Re-run: node scripts/test-share-images.mjs");
   process.exit(1);
 }
