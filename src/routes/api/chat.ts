@@ -21,6 +21,7 @@ import {
 } from "ai";
 import { createClient } from "@supabase/supabase-js";
 import { resolveProvider } from "@/lib/ai-provider.server";
+import { parseModelSwitch } from "@/lib/model-switch";
 import { DED_PERSONA } from "@/lib/persona";
 import { embedText } from "@/lib/embeddings.server";
 import {
