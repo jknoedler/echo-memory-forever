@@ -1,18 +1,57 @@
 // Generates a multi-topic summary title for a thread.
-// Strategy: list up to 7 topics, prioritize ones the user spent the most
-// time on (longest stretches of consecutive messages on that topic),
-// drop one-off questions when there are more than 7. ≤ 80 chars.
+// Uses whichever built-in chat provider is configured (Groq → OpenAI →
+// Venice → Llama). Returns null when nothing is configured.
 
 import { generateText } from "ai";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { createLovableAiGatewayProvider } from "./ai-gateway.server";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+
+function pickTitler(): { model: ReturnType<ReturnType<typeof createOpenAICompatible>> } | null {
+  const groq = process.env.GROQ_API_KEY;
+  if (groq) {
+    const p = createOpenAICompatible({
+      name: "groq",
+      baseURL: "https://api.groq.com/openai/v1",
+      headers: { Authorization: `Bearer ${groq}` },
+    });
+    return { model: p("llama-3.3-70b-versatile") };
+  }
+  const openai = process.env.OPENAI_API_KEY;
+  if (openai) {
+    const p = createOpenAICompatible({
+      name: "openai",
+      baseURL: "https://api.openai.com/v1",
+      headers: { Authorization: `Bearer ${openai}` },
+    });
+    return { model: p("gpt-4o-mini") };
+  }
+  const venice = process.env.VENICE_API_KEY;
+  if (venice) {
+    const p = createOpenAICompatible({
+      name: "venice",
+      baseURL: "https://api.venice.ai/api/v1",
+      headers: { Authorization: `Bearer ${venice}` },
+    });
+    return { model: p("venice-uncensored") };
+  }
+  const llama = process.env.LLAMA_API_KEY;
+  if (llama) {
+    const p = createOpenAICompatible({
+      name: "llama",
+      baseURL: "https://api.llama.com/compat/v1",
+      headers: { Authorization: `Bearer ${llama}` },
+    });
+    return { model: p("Llama-3.3-70B-Instruct") };
+  }
+  return null;
+}
 
 export async function summarizeThreadTitle(
   supabase: SupabaseClient,
   threadId: string,
 ): Promise<string | null> {
-  const lovableKey = process.env.LOVABLE_API_KEY;
-  if (!lovableKey) return null;
+  const picked = pickTitler();
+  if (!picked) return null;
 
   const { data: rows } = await supabase
     .from("messages")
@@ -22,14 +61,10 @@ export async function summarizeThreadTitle(
     .limit(200);
   if (!rows || rows.length < 2) return null;
 
-  // Compact transcript; cap each message to keep prompt small.
   const transcript = rows
     .map((m) => `${m.role === "user" ? "U" : "A"}: ${(m.content ?? "").slice(0, 400)}`)
     .join("\n")
     .slice(0, 12_000);
-
-  const provider = createLovableAiGatewayProvider(lovableKey);
-  const model = provider.chatModel("google/gemini-3-flash-preview");
 
   const sys = [
     "You write short multi-topic titles for chat threads.",
@@ -44,7 +79,7 @@ export async function summarizeThreadTitle(
 
   try {
     const { text } = await generateText({
-      model,
+      model: picked.model,
       system: sys,
       prompt: `Transcript:\n${transcript}\n\nTitle:`,
     });
