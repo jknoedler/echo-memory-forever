@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { rootMeta } from "@/lib/brand-meta";
 
 // Properly-sized icon assets live in `public/` and are served at their
 // literal paths. Variants are generated from a single brand mark source by
@@ -20,7 +21,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 const FAVICON_32 = "/favicon-32.png";
 const FAVICON_48 = "/favicon-48.png";
 const APPLE_TOUCH_ICON = "/apple-touch-icon.png";
-const OG_IMAGE = "/og-image.png";
 
 function NotFoundComponent() {
   return (
@@ -87,17 +87,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "author", content: "MementØ" },
-      { name: "theme-color", content: "#0a0a0a" },
-      { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "MementØ" },
-      { property: "og:image", content: OG_IMAGE },
-      { property: "og:image:width", content: "1200" },
-      { property: "og:image:height", content: "630" },
-      { property: "og:image:type", content: "image/png" },
-      { property: "og:image:alt", content: "MementØ — MØRE / 0 loss" },
-      { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:image", content: OG_IMAGE },
+      ...rootMeta(),
     ],
     links: [
       {
