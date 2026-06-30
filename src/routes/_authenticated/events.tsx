@@ -6,15 +6,20 @@ import { CalendarDays, Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { AppShell } from "@/components/app-shell";
 import { createEvent, deleteEvent, listEvents } from "@/lib/events.functions";
+import { BRAND, pageMeta } from "@/lib/brand-meta";
 
 export const Route = createFileRoute("/_authenticated/events")({
   component: EventsPage,
   head: () => ({
     meta: [
-      { title: "Calendar — MementØ" },
-      { name: "description", content: "Your dated milestones, anchored for the archive." },
+      ...pageMeta({
+        title: "Calendar — MementØ",
+        description: "Your dated milestones, anchored for the archive.",
+        ogDescription: "Private calendar anchors for your MementØ archive.",
+        ogUrl: `${BRAND.domain}/events`,
+      }),
     ],
-    links: [{ rel: "canonical", href: "/events" }],
+    links: [{ rel: "canonical", href: `${BRAND.domain}/events` }],
   }),
 });
 

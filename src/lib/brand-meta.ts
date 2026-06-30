@@ -4,7 +4,7 @@
  * Every route reads OG / Twitter / description copy from here so the share
  * preview can never drift between pages. Update values here, not in routes.
  *
- * Hard rule (enforced by scripts/audit-share-images.mjs):
+ * Hard rule (enforced by scripts/test-share-images.mjs):
  *   og:image and twitter:image MUST resolve to a local /public path.
  *   External http(s) URLs are rejected at build time.
  */
@@ -35,8 +35,18 @@ export const BRAND = {
 } as const;
 
 type MetaEntry =
+  | { title: string }
   | { name: string; content: string }
   | { property: string; content: string };
+
+export type PageMetaInput = {
+  title?: string;
+  description?: string;
+  ogTitle?: string;
+  ogDescription?: string;
+  ogUrl?: string;
+  type?: "website" | "article" | "profile" | "product";
+};
 
 /**
  * Shared og/twitter image meta. Use in any route that wants the canonical
@@ -52,6 +62,25 @@ export function shareImageMeta(): MetaEntry[] {
     { property: "og:image:alt", content: BRAND.ogImage.alt },
     { name: "twitter:image", content: BRAND.ogImage.path },
     { name: "twitter:card", content: "summary_large_image" },
+  ];
+}
+
+/** Shared page-level title / description metadata. */
+export function pageMeta(input: PageMetaInput = {}): MetaEntry[] {
+  const title = input.title ?? BRAND.defaultTitle;
+  const description = input.description ?? BRAND.defaultDescription;
+  const ogTitle = input.ogTitle ?? title;
+  const ogDescription = input.ogDescription ?? BRAND.shareDescription;
+
+  return [
+    { title },
+    { name: "description", content: description },
+    { property: "og:title", content: ogTitle },
+    { property: "og:description", content: ogDescription },
+    { name: "twitter:title", content: ogTitle },
+    { name: "twitter:description", content: ogDescription },
+    ...(input.ogUrl ? [{ property: "og:url", content: input.ogUrl } satisfies MetaEntry] : []),
+    ...(input.type ? [{ property: "og:type", content: input.type } satisfies MetaEntry] : []),
   ];
 }
 
