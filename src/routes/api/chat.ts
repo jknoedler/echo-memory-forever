@@ -204,11 +204,14 @@ export const Route = createFileRoute("/api/chat")({
             .maybeSingle();
           if (fb) fallbackProvider = fb;
         } else if (!settings?.fallback_provider_kind && !settings?.fallback_provider_id) {
-          // No explicit fallback configured — default to Venice (uncensored
-          // house fallback), then Gemini, then Groq.
-          if (FB_ENV.venice) fallbackEnvKind = "venice";
-          else if (FB_ENV.gemini) fallbackEnvKind = "gemini";
+          // No explicit fallback configured — default to the cheapest
+          // available built-in: Llama → Groq → OpenRouter → Gemini → Venice → OpenAI.
+          if (FB_ENV.llama) fallbackEnvKind = "llama";
           else if (FB_ENV.groq) fallbackEnvKind = "groq";
+          else if (FB_ENV.openrouter) fallbackEnvKind = "openrouter";
+          else if (FB_ENV.gemini) fallbackEnvKind = "gemini";
+          else if (FB_ENV.venice) fallbackEnvKind = "venice";
+          else if (FB_ENV.openai) fallbackEnvKind = "openai";
         }
 
 
@@ -542,8 +545,8 @@ export const Route = createFileRoute("/api/chat")({
             /* ignore unavailable automatic fallback */
           }
         };
-        // Walk order: free/fast first → broad catalog → paid → uncensored.
-        (["groq", "gemini", "openrouter", "openai", "venice", "llama"] as const).forEach(
+        // Walk order: cheapest/free → broad catalog → paid → uncensored.
+        (["llama", "groq", "openrouter", "gemini", "venice", "openai"] as const).forEach(
           addBuiltinFallback,
         );
 

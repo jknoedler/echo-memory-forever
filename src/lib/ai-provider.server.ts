@@ -117,16 +117,16 @@ function autoPick(cfg: UserAiConfig, opts: ResolveOpts): ResolvedProvider {
   const looksHostedGateway = m.includes("/"); // "google/gemini-...", "openai/gpt-..."
   const passModel = !looksHostedGateway ? m || undefined : undefined;
 
-  // Order: fastest free → broad catalog → paid → fallback. Groq first
-  // (free tier), then Gemini (free tier), then OpenRouter (broad), then
-  // OpenAI, Venice, Llama.
-  const order: BuiltinKind[] = ["groq", "gemini", "openrouter", "openai", "venice", "llama"];
+  // Order: cheapest/free first → broad catalog → paid → uncensored.
+  // Llama (free) → Groq (free) → OpenRouter (broad, cheap) → Gemini (free
+  // tier) → Venice (uncensored, paid) → OpenAI (paid).
+  const order: BuiltinKind[] = ["llama", "groq", "openrouter", "gemini", "venice", "openai"];
   for (const kind of order) {
     const key = pickKey(kind, opts);
     if (key) return buildBuiltin(kind, key, passModel);
   }
   throw new Error(
-    "No AI provider is configured. Add one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, VENICE_API_KEY, or LLAMA_API_KEY.",
+    "No AI provider is configured. Add one of LLAMA_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, VENICE_API_KEY, or OPENAI_API_KEY.",
   );
 }
 
