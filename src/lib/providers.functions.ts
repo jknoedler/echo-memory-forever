@@ -70,7 +70,7 @@ export const setActiveProvider = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       provider_id: z.string().uuid().nullable(),
-      provider_kind: z.enum(["lovable", "openai", "groq", "llama", "venice", "custom"]).optional(),
+      provider_kind: z.enum(["lovable", "openai", "groq", "llama", "venice", "gemini", "openrouter", "custom"]).optional(),
       model: z.string().max(200).optional(),
     }).parse(d),
   )
