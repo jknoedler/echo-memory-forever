@@ -13,6 +13,7 @@ import { ThemeProvider } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { rootMeta } from "@/lib/brand-meta";
 
 // Properly-sized icon assets live in `public/` and are served at their
 // literal paths. Variants are generated from a single brand mark source by
@@ -20,7 +21,6 @@ import { reportLovableError } from "../lib/lovable-error-reporting";
 const FAVICON_32 = "/favicon-32.png";
 const FAVICON_48 = "/favicon-48.png";
 const APPLE_TOUCH_ICON = "/apple-touch-icon.png";
-const OG_IMAGE = "/og-image.png";
 
 function NotFoundComponent() {
   return (
