@@ -3,7 +3,8 @@ import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-rou
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Brain, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { Mement0Logo, Mement0Mark } from "@/components/mement0-logo";
+import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
+import { BrandClock } from "@/components/brand-clock";
 import { supabase } from "@/integrations/supabase/client";
 import { createThread, deleteThread, listThreads } from "@/lib/threads.functions";
 
@@ -291,19 +292,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           >
             <Mement0Mark size={26} />
           </button>
-          <Link to="/app" className="font-display text-base font-semibold tracking-tight">
-            <span style={{ fontFamily: '"Bodoni Moda", "Bodoni 72", "Didot", "GFS Didot", serif' }}>
-              Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
-            </span>
+          <Link to="/app" className="text-base font-semibold tracking-tight">
+            <Mement0Wordmark />
           </Link>
 
-          <button
-            type="button"
-            onClick={() => createM.mutate()}
-            className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
-          >
-            New
-          </button>
+          <div className="flex items-center gap-2">
+            <BrandClock />
+            <button
+              type="button"
+              onClick={() => createM.mutate()}
+              className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+            >
+              New
+            </button>
+          </div>
         </div>
         {children}
       </main>
