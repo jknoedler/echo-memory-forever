@@ -203,12 +203,22 @@ function main() {
     if (!present.has(must)) errors.push(`missing required tag: ${must}`);
   }
 
+  for (const role of ["meta:og:image", "meta:twitter:image"]) {
+    const matches = refs.filter((r) => r.role === role);
+    if (matches.length > 1) {
+      errors.push(`${role}: duplicate tags found (${matches.length}); keep exactly one local /public image reference`);
+    }
+  }
+
   console.log(`Icon audit — ${refs.length} reference(s) in src/routes/__root.tsx\n`);
 
   for (const r of refs) {
     const rule = RULES[r.role];
     const resolved = resolveRef(r.href, assets);
     const head = `${r.role.padEnd(24)} ${r.href}`;
+    if ((r.role === "meta:og:image" || r.role === "meta:twitter:image") && /^https?:\/\//i.test(r.href)) {
+      errors.push(`${r.role}: external URLs are forbidden for share images; use /og-image.png or a tracked asset`);
+    }
     if (!resolved.ok) {
       errors.push(`${r.role}: ${resolved.reason}`);
       console.log(`  ${head}\n    ✗ ${resolved.reason}`);
