@@ -1,16 +1,8 @@
 // Multi-provider router. Returns an AI-SDK language model.
 //
-// Priority:
-//   1. activeProvider (a row from user_providers) — saved API key for a
-//      hosted catalog entry, OR a local runtime baseUrl. Spoken to via
-//      OpenAI-compatible chat completions.
-//   2. cfg.provider === "openai" | "groq" | "llama" | "venice" — direct call
-//      using the matching project secret.
-//   3. cfg.provider === "custom" — raw base URL + key configured in settings.
-//   4. Default ("auto" / "lovable" / anything unknown) — auto-pick the first
-//      available built-in provider in this order: groq, openai, venice, llama.
-//      This keeps the app fully functional with zero coupling to any
-//      first-party gateway.
+// Built-in providers: groq, openai, venice, llama, gemini, openrouter.
+// All are spoken to via OpenAI-compatible chat completions, so the
+// resolver only needs baseURL + apiKey + modelId.
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 
 export type UserAiConfig = {
@@ -36,70 +28,105 @@ export type ResolvedProvider = {
   modelId: string;
 };
 
+export type BuiltinKind = "openai" | "groq" | "llama" | "venice" | "gemini" | "openrouter";
+
 type ResolveOpts = {
   openaiApiKey?: string;
   groqApiKey?: string;
   llamaApiKey?: string;
   veniceApiKey?: string;
+  geminiApiKey?: string;
+  openrouterApiKey?: string;
   activeProvider?: ActiveProvider | null;
 };
 
+const BUILTIN_CONFIG: Record<
+  BuiltinKind,
+  { baseURL: string; defaultModel: string; envName: string }
+> = {
+  openai: {
+    baseURL: "https://api.openai.com/v1",
+    defaultModel: "gpt-4o-mini",
+    envName: "OPENAI_API_KEY",
+  },
+  groq: {
+    baseURL: "https://api.groq.com/openai/v1",
+    defaultModel: "llama-3.3-70b-versatile",
+    envName: "GROQ_API_KEY",
+  },
+  llama: {
+    baseURL: "https://api.llama.com/compat/v1",
+    defaultModel: "Llama-3.3-70B-Instruct",
+    envName: "LLAMA_API_KEY",
+  },
+  venice: {
+    baseURL: "https://api.venice.ai/api/v1",
+    defaultModel: "venice-uncensored",
+    envName: "VENICE_API_KEY",
+  },
+  gemini: {
+    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
+    defaultModel: "gemini-2.5-flash",
+    envName: "GEMINI_API_KEY",
+  },
+  openrouter: {
+    baseURL: "https://openrouter.ai/api/v1",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct",
+    envName: "OPENROUTER_API_KEY",
+  },
+};
+
+export function builtinDefaultModel(kind: BuiltinKind): string {
+  return BUILTIN_CONFIG[kind].defaultModel;
+}
+
 function buildBuiltin(
-  kind: "openai" | "groq" | "llama" | "venice",
+  kind: BuiltinKind,
   apiKey: string,
   modelOverride?: string,
 ): ResolvedProvider {
-  if (kind === "openai") {
-    const modelId = modelOverride || "gpt-4o-mini";
-    const provider = createOpenAICompatible({
-      name: "openai",
-      baseURL: "https://api.openai.com/v1",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return { model: provider(modelId), providerName: "openai", modelId };
-  }
-  if (kind === "groq") {
-    const modelId = modelOverride || "llama-3.3-70b-versatile";
-    const provider = createOpenAICompatible({
-      name: "groq",
-      baseURL: "https://api.groq.com/openai/v1",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return { model: provider(modelId), providerName: "groq", modelId };
-  }
-  if (kind === "llama") {
-    const modelId = modelOverride || "Llama-3.3-70B-Instruct";
-    const provider = createOpenAICompatible({
-      name: "llama",
-      baseURL: "https://api.llama.com/compat/v1",
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    return { model: provider(modelId), providerName: "llama", modelId };
-  }
-  // venice
-  const modelId = modelOverride || "venice-uncensored";
+  const cfg = BUILTIN_CONFIG[kind];
+  const modelId = modelOverride || cfg.defaultModel;
   const provider = createOpenAICompatible({
-    name: "venice",
-    baseURL: "https://api.venice.ai/api/v1",
+    name: kind,
+    baseURL: cfg.baseURL,
     headers: { Authorization: `Bearer ${apiKey}` },
   });
-  return { model: provider(modelId), providerName: "venice", modelId };
+  return { model: provider(modelId), providerName: kind, modelId };
+}
+
+function pickKey(kind: BuiltinKind, opts: ResolveOpts): string | undefined {
+  switch (kind) {
+    case "openai":
+      return opts.openaiApiKey;
+    case "groq":
+      return opts.groqApiKey;
+    case "llama":
+      return opts.llamaApiKey;
+    case "venice":
+      return opts.veniceApiKey;
+    case "gemini":
+      return opts.geminiApiKey;
+    case "openrouter":
+      return opts.openrouterApiKey;
+  }
 }
 
 function autoPick(cfg: UserAiConfig, opts: ResolveOpts): ResolvedProvider {
-  // Reasonable model override only when the saved cfg.model looks like it
-  // belongs to the picked provider — otherwise we let the built-in default
-  // for that provider win to avoid sending e.g. "google/gemini-..." to Groq.
   const m = (cfg.model || "").trim();
   const looksHostedGateway = m.includes("/"); // "google/gemini-...", "openai/gpt-..."
   const passModel = !looksHostedGateway ? m || undefined : undefined;
 
-  if (opts.groqApiKey) return buildBuiltin("groq", opts.groqApiKey, passModel);
-  if (opts.openaiApiKey) return buildBuiltin("openai", opts.openaiApiKey, passModel);
-  if (opts.veniceApiKey) return buildBuiltin("venice", opts.veniceApiKey, passModel);
-  if (opts.llamaApiKey) return buildBuiltin("llama", opts.llamaApiKey, passModel);
+  // Order: fastest free → broad catalog → paid → fallback. Groq first
+  // (free tier), then Gemini (free tier), then OpenRouter (broad), then
+  // OpenAI, Venice, Llama.
+  const order: BuiltinKind[] = ["groq", "gemini", "openrouter", "openai", "venice", "llama"];
+  for (const kind of order) {
+    const key = pickKey(kind, opts);
+    if (key) return buildBuiltin(kind, key, passModel);
+  }
   throw new Error(
-    "No AI provider is configured. Add one of GROQ_API_KEY, OPENAI_API_KEY, VENICE_API_KEY, or LLAMA_API_KEY.",
+    "No AI provider is configured. Add one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, VENICE_API_KEY, or LLAMA_API_KEY.",
   );
 }
 
@@ -124,23 +151,19 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
     return { model: provider(modelId), providerName: ap.catalog_id, modelId };
   }
 
-  if (cfg.provider === "openai") {
-    if (!opts.openaiApiKey) throw new Error("OpenAI provider selected but OPENAI_API_KEY is not configured.");
-    return buildBuiltin("openai", opts.openaiApiKey, cfg.model || undefined);
-  }
-  if (cfg.provider === "groq") {
-    if (!opts.groqApiKey) throw new Error("Groq provider selected but GROQ_API_KEY is not configured.");
-    return buildBuiltin("groq", opts.groqApiKey, cfg.model || undefined);
-  }
-  if (cfg.provider === "llama") {
-    if (!opts.llamaApiKey) throw new Error("Llama provider selected but LLAMA_API_KEY is not configured.");
-    return buildBuiltin("llama", opts.llamaApiKey, cfg.model || undefined);
-  }
-  if (cfg.provider === "venice") {
-    if (!opts.veniceApiKey) throw new Error("Venice provider selected but VENICE_API_KEY is not configured.");
-    return buildBuiltin("venice", opts.veniceApiKey, cfg.model || undefined);
+  // 2. Explicit built-in provider.
+  if (cfg.provider in BUILTIN_CONFIG) {
+    const kind = cfg.provider as BuiltinKind;
+    const key = pickKey(kind, opts);
+    if (!key) {
+      throw new Error(
+        `${kind} provider selected but ${BUILTIN_CONFIG[kind].envName} is not configured.`,
+      );
+    }
+    return buildBuiltin(kind, key, cfg.model || undefined);
   }
 
+  // 3. Custom (raw base URL + key).
   if (cfg.provider === "custom") {
     const baseURL = cfg.custom_base_url?.trim();
     const apiKey = cfg.custom_api_key?.trim() || "not-required";
@@ -154,6 +177,6 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
     return { model: provider(modelId), providerName: "custom", modelId };
   }
 
-  // "auto" / "lovable" / unknown → auto-pick.
+  // 4. "auto" / unknown → auto-pick.
   return autoPick(cfg, opts);
 }
