@@ -343,7 +343,7 @@ function NavItem({
   label,
   onClick,
 }: {
-  to: "/tasks" | "/settings" | "/library" | "/personality";
+  to: "/tasks" | "/settings" | "/library" | "/personality" | "/events";
   icon: ReactNode;
   label: string;
   onClick?: () => void;
