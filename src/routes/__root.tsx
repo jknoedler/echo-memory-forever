@@ -87,41 +87,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MementØ — MØRE" },
-      {
-        name: "description",
-        content:
-          "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
-      },
       { name: "author", content: "MementØ" },
       { name: "theme-color", content: "#0a0a0a" },
-      { property: "og:title", content: "MementØ — MØRE" },
-      {
-        property: "og:description",
-        content:
-          "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
-      },
       { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "MementØ" },
       { property: "og:image", content: OG_IMAGE },
       { property: "og:image:width", content: "1200" },
       { property: "og:image:height", content: "630" },
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:alt", content: "MementØ — MØRE / 0 loss" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:image", content: OG_IMAGE },
-      // LinkedIn / Slack / Discord / iMessage all read og:image — these
-      // are the explicit hints LinkedIn's post-inspector checks for.
-      { property: "og:image:type", content: "image/png" },
-      { property: "og:image:alt", content: "MementØ — MORE / 0 loss" },
-      { name: "twitter:title", content: "MementØ — MØRE" },
-      {
-        name: "twitter:description",
-        content:
-          "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence.",
-      },
-      { name: "description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
-      { property: "og:description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
-      { name: "twitter:description", content: "Memento: Your Eternal Archive is an AI that creates a lossless, lifelong digital archive of your existence." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/68308dae-f043-48d0-bd78-1cb927bd40d8/id-preview-b689bc67--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782807497723.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/68308dae-f043-48d0-bd78-1cb927bd40d8/id-preview-b689bc67--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782807497723.png" },
     ],
     links: [
       {
