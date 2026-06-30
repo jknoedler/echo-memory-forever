@@ -120,6 +120,16 @@ function parseIconRefs() {
   return refs;
 }
 
+function scanForbiddenShareImageUrls() {
+  const src = readFileSync(ROOT_ROUTE, "utf8");
+  const errors = [];
+  const externalShareMetaRe = /\{[^}]*?(?:property|name):\s*["'](?:og:image|twitter:image)["'][^}]*?content:\s*["'](https?:\/\/[^"']+)["'][^}]*?\}/g;
+  for (const match of src.matchAll(externalShareMetaRe)) {
+    errors.push(`forbidden external share image URL in ${relative(ROOT, ROOT_ROUTE)}: ${match[1]}`);
+  }
+  return errors;
+}
+
 /** Resolve `const NAME = "literal"` or `const NAME = something.url;`. */
 function resolveIdent(src, name) {
   const re = new RegExp(`const\\s+${name}\\s*=\\s*([^;]+);`);
@@ -197,6 +207,8 @@ function main() {
   const refs = parseIconRefs();
   /** @type {string[]} */ const errors = [];
   /** @type {string[]} */ const warnings = [];
+
+  errors.push(...scanForbiddenShareImageUrls());
 
   const present = new Set(refs.map((r) => r.role));
   for (const must of REQUIRED) {
