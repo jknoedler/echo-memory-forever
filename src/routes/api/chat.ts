@@ -91,7 +91,7 @@ export const Route = createFileRoute("/api/chat")({
         const token = authHeader.slice("Bearer ".length).trim();
         if (!token) return new Response("Unauthorized", { status: 401 });
 
-        let body: { messages?: UIMessage[]; threadId?: string };
+        let body: { messages?: UIMessage[]; threadId?: string; tz?: string };
         try {
           body = (await request.json()) as typeof body;
         } catch {
@@ -100,6 +100,7 @@ export const Route = createFileRoute("/api/chat")({
 
         const messages = body.messages;
         const threadId = body.threadId;
+        const userTz = (typeof body.tz === "string" && body.tz) || "America/Los_Angeles";
         if (!Array.isArray(messages) || !threadId) {
           return new Response("messages[] and threadId required", { status: 400 });
         }
