@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, CalendarDays, ChevronLeft, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Brain, CalendarDays, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
 import { BrandClock } from "@/components/brand-clock";
@@ -279,11 +279,24 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label={collapsed ? "Open archive" : "Close archive"}
           title={collapsed ? "Open archive" : "Close archive"}
           aria-expanded={!collapsed}
-          className="absolute top-1/2 -translate-y-1/2 -right-3 z-30 h-12 w-6 flex items-center justify-center rounded-r-md border border-l-0 border-border bg-sidebar text-muted-foreground hover:text-foreground hover:bg-sidebar-accent shadow-sm transition-colors"
+          className="absolute top-1/2 -translate-y-1/2 -right-3 z-30 h-9 w-6 flex items-center justify-center rounded-r-md border border-l-0 border-border bg-sidebar text-foreground hover:bg-sidebar-accent shadow-sm transition-colors"
         >
-          {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          <Mement0Mark size={14} />
         </button>
       </div>
+
+      {/* Mobile edge handle — small Ø poking out of the screen edge */}
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        aria-label="Open archive"
+        title="Open archive"
+        className={`md:hidden fixed left-0 top-1/2 -translate-y-1/2 z-30 h-9 w-5 flex items-center justify-center rounded-r-md border border-l-0 border-border bg-sidebar text-foreground shadow-sm transition-opacity ${
+          mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100"
+        }`}
+      >
+        <Mement0Mark size={12} />
+      </button>
 
       {/* Mobile drawer */}
       <div
@@ -304,6 +317,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <SidebarBody onNavigate={() => setMobileOpen(false)} />
         </aside>
       </div>
+
 
       <main className="flex-1 min-w-0 flex flex-col min-h-0">
         {/* mobile bar */}
