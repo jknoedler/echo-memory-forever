@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Brain, Database, Infinity as InfinityIcon, Lock, Radio, ShieldCheck } from "lucide-react";
-import { Mement0Logo } from "@/components/mement0-logo";
+import { Mement0Logo, Mement0Wordmark } from "@/components/mement0-logo";
 
 export const Route = createFileRoute("/about")({
   head: () => ({
@@ -47,10 +47,11 @@ function About() {
                style={{ background: "radial-gradient(closest-side, oklch(0.74 0.12 75 / 0.18), transparent)" }} />
         </div>
         <div className="mx-auto max-w-5xl px-5 pt-20 pb-20 text-center relative">
-          <p className="font-display text-5xl md:text-7xl font-semibold tracking-tight leading-[0.95] ember-text">Mement0</p>
-          <h1 className="mt-2 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95] ember-text">MORE</h1>
+          <Mement0Wordmark as="p" className="font-display text-5xl md:text-7xl font-semibold tracking-tight leading-[0.95] text-foreground" />
+          <h1 className="mt-2 font-display text-6xl md:text-8xl font-semibold tracking-tight leading-[0.95] text-foreground">MORE</h1>
           <p className="mt-2 text-xl md:text-2xl text-muted-foreground tracking-widest">0&nbsp;loss</p>
-          <p className="mt-4 text-xs uppercase tracking-[0.3em] text-primary/80">the 0 is for L's</p>
+          <p className="mt-4 text-xs uppercase tracking-[0.3em] text-muted-foreground">the 0 is for L's</p>
+
 
           <p className="mx-auto mt-10 max-w-2xl text-lg text-muted-foreground leading-relaxed">
             A lifelong, model-agnostic AI that remembers every thread of your life. Begin as a

@@ -292,8 +292,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Mement0Mark size={26} />
           </button>
           <Link to="/app" className="font-display text-base font-semibold tracking-tight">
-            Mement<span className="ember-text">0</span>
+            <span style={{ fontFamily: '"Bodoni Moda", "Bodoni 72", "Didot", "GFS Didot", serif' }}>
+              Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
+            </span>
           </Link>
+
           <button
             type="button"
             onClick={() => createM.mutate()}
