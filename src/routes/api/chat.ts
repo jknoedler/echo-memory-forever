@@ -277,6 +277,22 @@ export const Route = createFileRoute("/api/chat")({
           .join("\n");
         void nowIso;
 
+        // Server-side observability: log the actual injected calendar
+        // window every turn so we can spot drift between what's in the DB
+        // and what the model sees. Flags rows older than STALE_DAYS.
+        const eventsSummary = summarizeEventsBlock(eventsBlock);
+        if (eventsSummary.count > 0) {
+          const stalePart =
+            eventsSummary.staleCount > 0
+              ? ` ⚠️ ${eventsSummary.staleCount}/${eventsSummary.count} events older than ${eventsSummary.staleThresholdDays}d`
+              : "";
+          console.log(
+            `[chat] CALENDAR EVENTS injected user=${userId} thread=${threadId} count=${eventsSummary.count} range=${eventsSummary.oldest}..${eventsSummary.newest}${stalePart}`,
+          );
+        } else {
+          console.log(`[chat] CALENDAR EVENTS injected user=${userId} thread=${threadId} count=0`);
+        }
+
         // Continuity state for this thread
         const { data: contThread } = await supabase
           .from("threads")
