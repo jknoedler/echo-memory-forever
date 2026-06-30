@@ -135,12 +135,14 @@ export const Route = createFileRoute("/api/health/ai")({
   server: {
     handlers: {
       GET: async () => {
-        const providers: ProviderKind[] = ["groq", "openai", "venice", "llama"];
+        const providers: ProviderKind[] = ["groq", "gemini", "openrouter", "openai", "venice", "llama"];
         const keys: Record<ProviderKind, string | undefined> = {
           groq: process.env.GROQ_API_KEY,
           openai: process.env.OPENAI_API_KEY,
           venice: process.env.VENICE_API_KEY,
           llama: process.env.LLAMA_API_KEY,
+          gemini: process.env.GEMINI_API_KEY,
+          openrouter: process.env.OPENROUTER_API_KEY,
         };
         const results = await Promise.all(providers.map((p) => pingProvider(p, keys[p])));
         const anyOk = results.some((r) => r.status === "ok");
