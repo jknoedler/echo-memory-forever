@@ -406,6 +406,7 @@ export const Route = createFileRoute("/api/chat")({
 
         // Resolve primary provider
         let primaryModel: ReturnType<typeof resolveProvider>["model"];
+        let primaryLabel = "primary";
         try {
           const resolved = resolveProvider(cfg, {
             openaiApiKey: process.env.OPENAI_API_KEY,
@@ -415,6 +416,7 @@ export const Route = createFileRoute("/api/chat")({
             activeProvider,
           });
           primaryModel = resolved.model;
+          primaryLabel = resolved.providerName;
         } catch (e) {
           return new Response(
             `Provider error: ${e instanceof Error ? e.message : String(e)}`,
@@ -586,16 +588,24 @@ export const Route = createFileRoute("/api/chat")({
                   model,
                   system: sys,
                   messages: convertedMessages,
+                  maxRetries: 0,
                 });
-                for await (const delta of run.textStream) {
+                for await (const part of run.fullStream) {
+                  if (part.type === "error") {
+                    throw part.error;
+                  }
+                  if (part.type !== "text-delta") continue;
                   if (!started) {
                     writer.write({ type: "start", messageId });
                     writer.write({ type: "start-step" });
                     writer.write({ type: "text-start", id: partId });
                     started = true;
                   }
-                  text += delta;
-                  writer.write({ type: "text-delta", id: partId, delta });
+                  text += part.text;
+                  writer.write({ type: "text-delta", id: partId, delta: part.text });
+                }
+                if (!text.trim()) {
+                  throw new Error("Model returned an empty response.");
                 }
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
@@ -611,7 +621,7 @@ export const Route = createFileRoute("/api/chat")({
                 }
                 const creditsOrRateLimit = isCreditsOrRateLimitError(e);
                 console.error(
-                  `[chat] model stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
+                  `[chat] ${model === primaryModel ? primaryLabel : fallbackLabel ?? "fallback"} stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
                   e,
                 );
                 return { text, failed: true, creditsOrRateLimit };
