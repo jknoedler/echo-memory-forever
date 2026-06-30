@@ -30,7 +30,23 @@ import {
   updateStyleFingerprint,
 } from "@/lib/personality.server";
 import { FALLBACK_PREAMBLE, FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
+import {
+  STRICT_DATE_RETRY_SUFFIX,
+  summarizeEventsBlock,
+  validateCalendarCitation,
+} from "@/lib/calendar-validator";
 import type { Database } from "@/integrations/supabase/types";
+
+// Detect upstream 402 (credits exhausted) / 429 (rate-limited) failures so
+// we can route straight to the configured fallback (Venice by default)
+// instead of surfacing the gateway error to the user.
+function isCreditsOrRateLimitError(e: unknown): boolean {
+  const anyE = e as { statusCode?: number; status?: number; message?: string; cause?: { statusCode?: number } } | null;
+  const code = anyE?.statusCode ?? anyE?.status ?? anyE?.cause?.statusCode;
+  if (code === 402 || code === 429) return true;
+  const msg = (anyE?.message ?? "").toLowerCase();
+  return /\b(402|429)\b/.test(msg) || msg.includes("insufficient_quota") || msg.includes("rate limit") || msg.includes("credits");
+}
 
 function isNewKey(v: string) {
   return v.startsWith("sb_publishable_") || v.startsWith("sb_secret_");
@@ -261,6 +277,22 @@ export const Route = createFileRoute("/api/chat")({
           .join("\n");
         void nowIso;
 
+        // Server-side observability: log the actual injected calendar
+        // window every turn so we can spot drift between what's in the DB
+        // and what the model sees. Flags rows older than STALE_DAYS.
+        const eventsSummary = summarizeEventsBlock(eventsBlock);
+        if (eventsSummary.count > 0) {
+          const stalePart =
+            eventsSummary.staleCount > 0
+              ? ` ⚠️ ${eventsSummary.staleCount}/${eventsSummary.count} events older than ${eventsSummary.staleThresholdDays}d`
+              : "";
+          console.log(
+            `[chat] CALENDAR EVENTS injected user=${userId} thread=${threadId} count=${eventsSummary.count} range=${eventsSummary.oldest}..${eventsSummary.newest}${stalePart}`,
+          );
+        } else {
+          console.log(`[chat] CALENDAR EVENTS injected user=${userId} thread=${threadId} count=0`);
+        }
+
         // Continuity state for this thread
         const { data: contThread } = await supabase
           .from("threads")
@@ -345,6 +377,32 @@ export const Route = createFileRoute("/api/chat")({
           "### CONTINUITY",
           continuityBlock,
         ].join("\n");
+
+        // Persist a debug snapshot of what the model is about to see. Used
+        // by /api/debug/last-prompt to verify the CALENDAR EVENTS payload
+        // in staging. Best-effort — never blocks the chat turn.
+        let debugPayloadId: string | null = null;
+        try {
+          const { data: dbg } = await supabase
+            .from("chat_debug_payloads")
+            .insert({
+              user_id: userId,
+              thread_id: threadId,
+              system_prompt: system,
+              events_block: eventsBlock || null,
+              events_count: eventsSummary.count,
+              events_oldest: eventsSummary.oldest,
+              events_newest: eventsSummary.newest,
+              stale_events_count: eventsSummary.staleCount,
+              validator_status: "pending",
+              retried: false,
+            })
+            .select("id")
+            .maybeSingle();
+          debugPayloadId = dbg?.id ?? null;
+        } catch (e) {
+          console.warn("[chat] failed to persist debug payload:", e);
+        }
 
         // Resolve primary provider
         let primaryModel: ReturnType<typeof resolveProvider>["model"];
@@ -518,7 +576,7 @@ export const Route = createFileRoute("/api/chat")({
             async function runModel(
               model: typeof primaryModel,
               sys: string,
-            ): Promise<{ text: string; failed: boolean }> {
+            ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
               const messageId = crypto.randomUUID();
               const partId = crypto.randomUUID();
               let started = false;
@@ -544,17 +602,19 @@ export const Route = createFileRoute("/api/chat")({
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                return { text, failed: false };
+                return { text, failed: false, creditsOrRateLimit: false };
               } catch (e) {
-                // Close the message cleanly if we started one; otherwise
-                // emit nothing so the client doesn't render an empty bubble.
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                console.error("[chat] model stream failed:", e);
-                return { text, failed: true };
+                const creditsOrRateLimit = isCreditsOrRateLimitError(e);
+                console.error(
+                  `[chat] model stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
+                  e,
+                );
+                return { text, failed: true, creditsOrRateLimit };
               }
             }
 
@@ -567,6 +627,50 @@ export const Route = createFileRoute("/api/chat")({
               if (!primaryFailed && primaryText) {
                 await persistAssistant(primaryText, { tier: "primary" });
               }
+            }
+
+            // Calendar citation validator. If the user asked about dated
+            // material and the model failed to cite an ISO date from the
+            // injected CALENDAR EVENTS block, run one strict retry as a
+            // second visible assistant turn.
+            let validatorStatus: string = "skipped";
+            let didCalendarRetry = false;
+            if (!preempt && !primaryFailed && primaryText) {
+              const v = validateCalendarCitation({
+                eventsBlock,
+                userText,
+                reply: primaryText,
+              });
+              validatorStatus = v.ok ? `ok:${v.reason}` : `fail:${v.reason}`;
+              if (!v.ok) {
+                console.warn(
+                  `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
+                );
+                const retry = await runModel(primaryModel, system + STRICT_DATE_RETRY_SUFFIX);
+                if (!retry.failed && retry.text) {
+                  didCalendarRetry = true;
+                  const recheck = validateCalendarCitation({
+                    eventsBlock,
+                    userText,
+                    reply: retry.text,
+                  });
+                  validatorStatus = recheck.ok
+                    ? `retry-ok:${recheck.reason}`
+                    : `retry-fail:${recheck.reason}`;
+                  await persistAssistant(retry.text, {
+                    tier: "primary",
+                    calendar_retry: true,
+                  });
+                }
+              }
+            }
+
+            if (debugPayloadId) {
+              await supabase
+                .from("chat_debug_payloads")
+                .update({ validator_status: validatorStatus, retried: didCalendarRetry })
+                .eq("id", debugPayloadId)
+                .then(() => undefined, () => undefined);
             }
 
             const needFallback =

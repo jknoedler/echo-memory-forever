@@ -24,6 +24,8 @@ import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicBiometricsRouteImport } from './routes/api/public/biometrics'
+import { Route as ApiHealthAiRouteImport } from './routes/api/health.ai'
+import { Route as ApiDebugLastPromptRouteImport } from './routes/api/debug.last-prompt'
 import { Route as AuthenticatedCThreadIdRouteImport } from './routes/_authenticated/c.$threadId'
 
 const AuthRoute = AuthRouteImport.update({
@@ -101,6 +103,16 @@ const ApiPublicBiometricsRoute = ApiPublicBiometricsRouteImport.update({
   path: '/api/public/biometrics',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiHealthAiRoute = ApiHealthAiRouteImport.update({
+  id: '/api/health/ai',
+  path: '/api/health/ai',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDebugLastPromptRoute = ApiDebugLastPromptRouteImport.update({
+  id: '/api/debug/last-prompt',
+  path: '/api/debug/last-prompt',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedCThreadIdRoute = AuthenticatedCThreadIdRouteImport.update({
   id: '/c/$threadId',
   path: '/c/$threadId',
@@ -122,6 +134,8 @@ export interface FileRoutesByFullPath {
   '/api/tts': typeof ApiTtsRoute
   '/api/youtube': typeof ApiYoutubeRoute
   '/c/$threadId': typeof AuthenticatedCThreadIdRoute
+  '/api/debug/last-prompt': typeof ApiDebugLastPromptRoute
+  '/api/health/ai': typeof ApiHealthAiRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
 export interface FileRoutesByTo {
@@ -139,6 +153,8 @@ export interface FileRoutesByTo {
   '/api/tts': typeof ApiTtsRoute
   '/api/youtube': typeof ApiYoutubeRoute
   '/c/$threadId': typeof AuthenticatedCThreadIdRoute
+  '/api/debug/last-prompt': typeof ApiDebugLastPromptRoute
+  '/api/health/ai': typeof ApiHealthAiRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
 export interface FileRoutesById {
@@ -158,6 +174,8 @@ export interface FileRoutesById {
   '/api/tts': typeof ApiTtsRoute
   '/api/youtube': typeof ApiYoutubeRoute
   '/_authenticated/c/$threadId': typeof AuthenticatedCThreadIdRoute
+  '/api/debug/last-prompt': typeof ApiDebugLastPromptRoute
+  '/api/health/ai': typeof ApiHealthAiRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
 }
 export interface FileRouteTypes {
@@ -177,6 +195,8 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/youtube'
     | '/c/$threadId'
+    | '/api/debug/last-prompt'
+    | '/api/health/ai'
     | '/api/public/biometrics'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -194,6 +214,8 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/youtube'
     | '/c/$threadId'
+    | '/api/debug/last-prompt'
+    | '/api/health/ai'
     | '/api/public/biometrics'
   id:
     | '__root__'
@@ -212,6 +234,8 @@ export interface FileRouteTypes {
     | '/api/tts'
     | '/api/youtube'
     | '/_authenticated/c/$threadId'
+    | '/api/debug/last-prompt'
+    | '/api/health/ai'
     | '/api/public/biometrics'
   fileRoutesById: FileRoutesById
 }
@@ -224,6 +248,8 @@ export interface RootRouteChildren {
   ApiSttRoute: typeof ApiSttRoute
   ApiTtsRoute: typeof ApiTtsRoute
   ApiYoutubeRoute: typeof ApiYoutubeRoute
+  ApiDebugLastPromptRoute: typeof ApiDebugLastPromptRoute
+  ApiHealthAiRoute: typeof ApiHealthAiRoute
   ApiPublicBiometricsRoute: typeof ApiPublicBiometricsRoute
 }
 
@@ -334,6 +360,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicBiometricsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/health/ai': {
+      id: '/api/health/ai'
+      path: '/api/health/ai'
+      fullPath: '/api/health/ai'
+      preLoaderRoute: typeof ApiHealthAiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/debug/last-prompt': {
+      id: '/api/debug/last-prompt'
+      path: '/api/debug/last-prompt'
+      fullPath: '/api/debug/last-prompt'
+      preLoaderRoute: typeof ApiDebugLastPromptRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/c/$threadId': {
       id: '/_authenticated/c/$threadId'
       path: '/c/$threadId'
@@ -376,6 +416,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiSttRoute: ApiSttRoute,
   ApiTtsRoute: ApiTtsRoute,
   ApiYoutubeRoute: ApiYoutubeRoute,
+  ApiDebugLastPromptRoute: ApiDebugLastPromptRoute,
+  ApiHealthAiRoute: ApiHealthAiRoute,
   ApiPublicBiometricsRoute: ApiPublicBiometricsRoute,
 }
 export const routeTree = rootRouteImport
