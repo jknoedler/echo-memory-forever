@@ -20,7 +20,7 @@ jobs:
       - name: Brand audit — no stray "Mement0", every product mention uses MementØ
         run: |
           node scripts/audit-branding.mjs || {
-            echo "::error::Brand audit failed. Update src/lib/brand-meta.ts or the offending file, or add the path to ALLOW in scripts/audit-branding.mjs if intentional.";
+            echo "::error::Brand audit failed. Remove stale metadata or move intentional canonical copy to src/lib/brand-meta.ts. Do not allowlist stale root metadata.";
             exit 1;
           }
       - name: Share-image audit — og:image / twitter:image must come from brand-meta.ts

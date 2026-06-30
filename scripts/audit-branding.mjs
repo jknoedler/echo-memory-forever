@@ -45,6 +45,8 @@ const EXT = /\.(tsx|html)$/;
 const negativeHits = [];
 /** @type {{file:string, role:string, value:string}[]} */
 const positiveHits = [];
+/** @type {{file:string,line:number,text:string}[]} */
+const staleMetaHits = [];
 
 // ─────────────────────────── pass 1: source tree ────────────────────────────
 function walk(dir) {
@@ -65,6 +67,9 @@ function walk(dir) {
         if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
         if (/^\s*import\s/.test(line)) return;
         if (NEEDLE.test(line)) negativeHits.push({ file: rel, line: i + 1, text: trimmed });
+        if (/Memento\s*:\s*Your Eternal Archive/i.test(line)) {
+          staleMetaHits.push({ file: rel, line: i + 1, text: trimmed });
+        }
       });
     }
 
@@ -164,8 +169,15 @@ if (positiveHits.length) {
   console.error("");
 }
 
+if (staleMetaHits.length) {
+  failed = true;
+  console.error(`✗ brand audit (stale metadata): ${staleMetaHits.length} legacy metadata string(s) found:\n`);
+  for (const h of staleMetaHits) console.error(`  ${h.file}:${h.line}  ${h.text}`);
+  console.error("");
+}
+
 if (failed) {
-  console.error("If an occurrence is intentional, add the path to ALLOW in scripts/audit-branding.mjs.");
+  console.error("How to fix: remove stale metadata or move intentional canonical copy to src/lib/brand-meta.ts. Do not allowlist stale root metadata.");
   process.exit(1);
 }
 
