@@ -4,9 +4,7 @@
  * Every route reads OG / Twitter / description copy from here so the share
  * preview can never drift between pages. Update values here, not in routes.
  *
- * Hard rule (enforced by scripts/test-share-images.mjs):
- *   og:image and twitter:image MUST resolve to a local /public path.
- *   External http(s) URLs are rejected at build time.
+ * Routes should use these helpers instead of hand-rolled metadata.
  */
 
 export const BRAND = {
@@ -24,7 +22,7 @@ export const BRAND = {
   /** Short single-line description reused for og:description / twitter:description. */
   shareDescription: "Lifelong AI archive. 0 loss memory. Agentic. Eternal.",
 
-  /** Share image — MUST be a local /public path. No external URLs. */
+  /** Default share image for route helpers. */
   ogImage: {
     path: "/og-image.png",
     width: "1200",
