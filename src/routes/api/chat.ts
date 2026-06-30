@@ -218,6 +218,26 @@ export const Route = createFileRoute("/api/chat")({
         const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
         const userText = lastUserMsg ? extractUserText(lastUserMsg) : "";
 
+        // In-chat model switch: "use gemini pro", "switch to groq", etc.
+        // Apply BEFORE resolving the provider so the new model serves this turn.
+        let switchedTo: { provider: string; model: string; label: string } | null = null;
+        const wanted = parseModelSwitch(userText);
+        if (wanted) {
+          // Clear any saved library provider so the built-in kind takes over.
+          cfg.provider = wanted.provider;
+          cfg.model = wanted.model;
+          activeProvider = null;
+          switchedTo = wanted;
+          await supabase
+            .from("user_settings")
+            .update({
+              provider: wanted.provider,
+              model: wanted.model,
+              active_provider_id: null,
+            })
+            .eq("user_id", userId);
+        }
+
         // Retrieve memories
         let memoryBlock = "";
         if (userText) {
