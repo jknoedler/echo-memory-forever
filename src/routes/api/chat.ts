@@ -317,6 +317,9 @@ export const Route = createFileRoute("/api/chat")({
           "### STAGED TASKS PENDING APPROVAL",
           pendingBlock || "(none)",
           "",
+          "### CALENDAR EVENTS (user-curated, authoritative for dates)",
+          eventsBlock || "(none)",
+          "",
           "### CONTINUITY",
           continuityBlock,
         ].join("\n");
