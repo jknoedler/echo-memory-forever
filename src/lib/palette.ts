@@ -1,6 +1,6 @@
 // Customizable color palettes for Mement0.
 // Backgrounds = neutral, faded, low-chroma surfaces.
-// Accents = muted jewel tones in the amber family.
+// Accents = muted jewel tones — obsidian-purple family (no amber).
 
 export type BgPalette = {
   id: string;
@@ -135,20 +135,18 @@ export function applyPalettes(bgId: string, accentId: string) {
   set("--border", ok(surfaces.border, c, h));
   set("--input", ok(surfaces.input, c, h));
 
+  // Single accent source. --ring/--ember/--sidebar-primary/--sidebar-ring
+  // all read back through var(--primary) in styles.css, so writing the one
+  // pair below repaints every accent surface in the app.
   set("--primary", primary);
   set("--primary-foreground", primaryFg);
-  set("--ring", primary);
-  set("--ember", primary);
-  set("--ember-foreground", primaryFg);
 
   set("--sidebar", ok(surfaces.sidebar, c, h));
   set("--sidebar-foreground", ok(surfaces.sidebarFg, c, h));
-  set("--sidebar-primary", primary);
-  set("--sidebar-primary-foreground", primaryFg);
   set("--sidebar-accent", ok(surfaces.sidebarAccent, c, h));
   set("--sidebar-accent-foreground", ok(dark ? 0.96 : 0.20, c, h));
   set("--sidebar-border", ok(surfaces.sidebarBorder, c, h));
-  set("--sidebar-ring", primary);
+
 
   // Force theme class to match the chosen background tone so other
   // class-based dark/light styling still lines up.
