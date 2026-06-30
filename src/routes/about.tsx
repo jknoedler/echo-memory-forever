@@ -5,18 +5,19 @@ import { Mement0Logo, Mement0Wordmark } from "@/components/mement0-logo";
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About — Mement0" },
+      { title: "About — MementØ" },
       {
         name: "description",
         content:
-          "Mement0 is a lifelong, model-agnostic AI archive. MORE memory. 0 loss. Built to grow with you and outlive you.",
+          "MementØ is a lifelong, model-agnostic AI archive. MORE memory. 0 loss. Built to grow with you and outlive you.",
       },
-      { property: "og:title", content: "About — Mement0" },
+      { property: "og:title", content: "About — MementØ" },
       {
         property: "og:description",
         content: "Lifelong AI archive. 0 loss memory. Agentic. Eternal.",
       },
     ],
+    links: [{ rel: "canonical", href: "/about" }],
   }),
   component: About,
 });

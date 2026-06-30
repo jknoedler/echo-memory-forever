@@ -13,6 +13,8 @@ import { ThemeProvider } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import brandLogo from "@/assets/mement0-logo.png.asset.json";
+const brandLogoUrl = brandLogo.url;
 
 function NotFoundComponent() {
   return (
@@ -79,28 +81,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Mement0 — MORE / 0 loss" },
+      { title: "MementØ — MORE / 0 loss" },
       {
         name: "description",
         content:
-          "Mement0 is a lifelong AI archive of your life. Lossless memory, model-agnostic, agentic. Your legacy, never forgotten.",
+          "MementØ is a lifelong AI archive of your life. Lossless memory, model-agnostic, agentic. Your legacy, never forgotten.",
       },
-      { name: "author", content: "Mement0" },
-      { name: "theme-color", content: "#1f1c19" },
-      { property: "og:title", content: "Mement0 — MORE / 0 loss" },
+      { name: "author", content: "MementØ" },
+      { name: "theme-color", content: "#0a0a0a" },
+      { property: "og:title", content: "MementØ — MORE / 0 loss" },
       {
         property: "og:description",
         content:
           "A lifelong AI memory and agentic OS. 0 loss. Your archive, eternal.",
       },
       { property: "og:type", content: "website" },
+      { property: "og:image", content: brandLogoUrl },
       { name: "twitter:card", content: "summary" },
+      { name: "twitter:image", content: brandLogoUrl },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
+      { rel: "icon", type: "image/png", href: brandLogoUrl },
+      { rel: "shortcut icon", type: "image/png", href: brandLogoUrl },
+      { rel: "apple-touch-icon", href: brandLogoUrl },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
