@@ -30,7 +30,23 @@ import {
   updateStyleFingerprint,
 } from "@/lib/personality.server";
 import { FALLBACK_PREAMBLE, FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
+import {
+  STRICT_DATE_RETRY_SUFFIX,
+  summarizeEventsBlock,
+  validateCalendarCitation,
+} from "@/lib/calendar-validator";
 import type { Database } from "@/integrations/supabase/types";
+
+// Detect upstream 402 (credits exhausted) / 429 (rate-limited) failures so
+// we can route straight to the configured fallback (Venice by default)
+// instead of surfacing the gateway error to the user.
+function isCreditsOrRateLimitError(e: unknown): boolean {
+  const anyE = e as { statusCode?: number; status?: number; message?: string; cause?: { statusCode?: number } } | null;
+  const code = anyE?.statusCode ?? anyE?.status ?? anyE?.cause?.statusCode;
+  if (code === 402 || code === 429) return true;
+  const msg = (anyE?.message ?? "").toLowerCase();
+  return /\b(402|429)\b/.test(msg) || msg.includes("insufficient_quota") || msg.includes("rate limit") || msg.includes("credits");
+}
 
 function isNewKey(v: string) {
   return v.startsWith("sb_publishable_") || v.startsWith("sb_secret_");
