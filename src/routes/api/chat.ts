@@ -629,6 +629,50 @@ export const Route = createFileRoute("/api/chat")({
               }
             }
 
+            // Calendar citation validator. If the user asked about dated
+            // material and the model failed to cite an ISO date from the
+            // injected CALENDAR EVENTS block, run one strict retry as a
+            // second visible assistant turn.
+            let validatorStatus: string = "skipped";
+            let didCalendarRetry = false;
+            if (!preempt && !primaryFailed && primaryText) {
+              const v = validateCalendarCitation({
+                eventsBlock,
+                userText,
+                reply: primaryText,
+              });
+              validatorStatus = v.ok ? `ok:${v.reason}` : `fail:${v.reason}`;
+              if (!v.ok) {
+                console.warn(
+                  `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
+                );
+                const retry = await runModel(primaryModel, system + STRICT_DATE_RETRY_SUFFIX);
+                if (!retry.failed && retry.text) {
+                  didCalendarRetry = true;
+                  const recheck = validateCalendarCitation({
+                    eventsBlock,
+                    userText,
+                    reply: retry.text,
+                  });
+                  validatorStatus = recheck.ok
+                    ? `retry-ok:${recheck.reason}`
+                    : `retry-fail:${recheck.reason}`;
+                  await persistAssistant(retry.text, {
+                    tier: "primary",
+                    calendar_retry: true,
+                  });
+                }
+              }
+            }
+
+            if (debugPayloadId) {
+              await supabase
+                .from("chat_debug_payloads")
+                .update({ validator_status: validatorStatus, retried: didCalendarRetry })
+                .eq("id", debugPayloadId)
+                .then(() => undefined, () => undefined);
+            }
+
             const needFallback =
               !!fallbackModel &&
               (preempt || primaryFailed || looksLikeRefusal(primaryText));
