@@ -40,7 +40,7 @@ export function ChatSettings({
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const fallbackM = useMutation({
-    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | null }) =>
+    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | "gemini" | "openrouter" | null }) =>
       updateMySettings({
         data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
       }),
@@ -154,32 +154,44 @@ export function ChatSettings({
                       ? "env:venice"
                       : settingsQ.data?.fallback_provider_kind === "groq"
                         ? "env:groq"
-                        : settingsQ.data?.fallback_provider_kind === "openai"
-                          ? "env:openai"
-                          : settingsQ.data?.fallback_provider_kind === "llama"
-                            ? "env:llama"
-                            : settingsQ.data?.fallback_provider_id ?? ""
+                      : settingsQ.data?.fallback_provider_kind === "openrouter"
+                        ? "env:openrouter"
+                        : settingsQ.data?.fallback_provider_kind === "gemini"
+                          ? "env:gemini"
+                          : settingsQ.data?.fallback_provider_kind === "openai"
+                            ? "env:openai"
+                            : settingsQ.data?.fallback_provider_kind === "llama"
+                              ? "env:llama"
+                              : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
                     if (v === "env:venice") fallbackM.mutate({ id: null, kind: "venice" });
                     else if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
+                    else if (v === "env:openrouter") fallbackM.mutate({ id: null, kind: "openrouter" });
+                    else if (v === "env:gemini") fallbackM.mutate({ id: null, kind: "gemini" });
                     else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
                     else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
                   <option value="">
-                    {envQ.data?.venice ? "Auto (Venice — default)" : "Off"}
+                    {envQ.data?.groq || envQ.data?.openrouter || envQ.data?.gemini ? "Auto (Groq/OpenRouter/Gemini)" : "Off"}
                   </option>
-                  {envQ.data?.venice && (
-                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
-                  )}
-                  {envQ.data?.llama && (
-                    <option value="env:llama">Llama (project key) · Llama 3.3 70B</option>
-                  )}
                   {envQ.data?.groq && (
                     <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
+                  )}
+                  {envQ.data?.openrouter && (
+                    <option value="env:openrouter">OpenRouter (project key) · Llama 3.3 70B</option>
+                  )}
+                  {envQ.data?.gemini && (
+                    <option value="env:gemini">Gemini (project key) · 2.5 Flash</option>
+                  )}
+                  {envQ.data?.llama && (
+                    <option value="env:llama">Direct Llama (project key) · can 401</option>
+                  )}
+                  {envQ.data?.venice && (
+                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
                   )}
                   {envQ.data?.openai && (
                     <option value="env:openai">OpenAI (project key) · gpt-4o-mini</option>
@@ -215,7 +227,7 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "custom"; model?: string }) =>
+    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "gemini" | "openrouter" | "custom"; model?: string }) =>
       setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
@@ -239,6 +251,8 @@ export function ModelPicker() {
   const envGroqActive = !activeId && providerKind === "groq";
   const envLlamaActive = !activeId && providerKind === "llama";
   const envVeniceActive = !activeId && providerKind === "venice";
+  const envGeminiActive = !activeId && providerKind === "gemini";
+  const envOpenRouterActive = !activeId && providerKind === "openrouter";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
@@ -251,7 +265,11 @@ export function ModelPicker() {
           ? `Llama · ${settingsQ.data?.model || "Llama-3.3-70B-Instruct"}`
           : envVeniceActive
             ? `Venice · ${settingsQ.data?.model || "venice-uncensored"}`
-            : "Auto (recommended)";
+            : envGeminiActive
+              ? `Gemini · ${settingsQ.data?.model || "gemini-2.5-flash"}`
+              : envOpenRouterActive
+                ? `OpenRouter · ${settingsQ.data?.model || "meta-llama/llama-3.3-70b-instruct"}`
+                : "Auto (recommended)";
 
 
   const connectedByCat = new Map(
@@ -278,6 +296,24 @@ export function ModelPicker() {
       provider_id: null,
       provider_kind: "groq",
       model: "llama-3.3-70b-versatile",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvOpenRouter() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "openrouter",
+      model: "meta-llama/llama-3.3-70b-instruct",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvGemini() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "gemini",
+      model: "gemini-2.5-flash",
     });
     setOpen(false);
   }
@@ -342,8 +378,77 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && !envGeminiActive && !envOpenRouterActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.groq && !connectedByCat.get("groq") && (
+            <button
+              type="button"
+              onClick={pickEnvGroq}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envGroqActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Groq (project key)</span>
+                <span className="block text-[10px] truncate">
+                  llama-3.3-70b-versatile · hosted Llama
+                </span>
+              </span>
+              {envGroqActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
+          {envQ.data?.openrouter && !connectedByCat.get("openrouter") && (
+            <button
+              type="button"
+              onClick={pickEnvOpenRouter}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envOpenRouterActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">OpenRouter (project key)</span>
+                <span className="block text-[10px] truncate">
+                  meta-llama/llama-3.3-70b-instruct
+                </span>
+              </span>
+              {envOpenRouterActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
+          {envQ.data?.gemini && (
+            <button
+              type="button"
+              onClick={pickEnvGemini}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envGeminiActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Gemini (project key)</span>
+                <span className="block text-[10px] truncate">
+                  gemini-2.5-flash · stable fallback
+                </span>
+              </span>
+              {envGeminiActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           {envQ.data?.venice && (
             <button
               type="button"
@@ -383,29 +488,6 @@ export function ModelPicker() {
                 </span>
               </span>
               {envLlamaActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
-          {envQ.data?.groq && !connectedByCat.get("groq") && (
-            <button
-              type="button"
-              onClick={pickEnvGroq}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envGroqActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">Groq (project key)</span>
-                <span className="block text-[10px] truncate">
-                  llama-3.3-70b-versatile · uses GROQ_API_KEY
-                </span>
-              </span>
-              {envGroqActive ? (
                 <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : (
                 <span className="text-[9px] uppercase tracking-widest text-muted-foreground">

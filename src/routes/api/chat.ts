@@ -204,12 +204,13 @@ export const Route = createFileRoute("/api/chat")({
             .maybeSingle();
           if (fb) fallbackProvider = fb;
         } else if (!settings?.fallback_provider_kind && !settings?.fallback_provider_id) {
-          // No explicit fallback configured — default to the cheapest
-          // available built-in: Llama → Groq → OpenRouter → Gemini → Venice → OpenAI.
-          if (FB_ENV.llama) fallbackEnvKind = "llama";
-          else if (FB_ENV.groq) fallbackEnvKind = "groq";
+          // No explicit fallback configured — default to stable hosted Llama
+          // routes first. Direct Meta Llama can intermittently 401, so keep it
+          // behind Groq/OpenRouter/Gemini instead of making it the first fallback.
+          if (FB_ENV.groq) fallbackEnvKind = "groq";
           else if (FB_ENV.openrouter) fallbackEnvKind = "openrouter";
           else if (FB_ENV.gemini) fallbackEnvKind = "gemini";
+          else if (FB_ENV.llama) fallbackEnvKind = "llama";
           else if (FB_ENV.venice) fallbackEnvKind = "venice";
           else if (FB_ENV.openai) fallbackEnvKind = "openai";
         }
@@ -545,8 +546,8 @@ export const Route = createFileRoute("/api/chat")({
             /* ignore unavailable automatic fallback */
           }
         };
-        // Walk order: cheapest/free → broad catalog → paid → uncensored.
-        (["llama", "groq", "openrouter", "gemini", "venice", "openai"] as const).forEach(
+        // Walk order: stable hosted routes first, direct Meta Llama later.
+        (["groq", "openrouter", "gemini", "llama", "venice", "openai"] as const).forEach(
           addBuiltinFallback,
         );
 
@@ -787,7 +788,7 @@ export const Route = createFileRoute("/api/chat")({
                   type: "text-delta",
                   id: pid,
                   delta:
-                    "The primary model is overloaded or refused, and no fallback is configured. Open Settings → Advanced to wire one up (Venice / Groq / Llama), then try again.",
+                    "The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.",
                 });
                 writer.write({ type: "text-end", id: pid });
                 writer.write({ type: "finish-step" });
@@ -826,7 +827,7 @@ export const Route = createFileRoute("/api/chat")({
               writer.write({ type: "start-step" });
               writer.write({ type: "text-start", id: pid });
               const delta =
-                "No configured model is available right now: Groq is rate-limited or exhausted, Venice is out of credits, OpenAI quota is exhausted, and/or Llama rejected its key. Check /api/health/ai, then top up or replace the bad key.";
+                "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
               writer.write({ type: "text-delta", id: pid, delta });
               writer.write({ type: "text-end", id: pid });
               writer.write({ type: "finish-step" });

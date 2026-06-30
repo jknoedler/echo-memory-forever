@@ -27,7 +27,7 @@ export const getMySettings = createServerFn({ method: "GET" })
   });
 
 const SettingsUpdate = z.object({
-  provider: z.enum(["lovable", "openai", "groq", "llama", "venice", "custom"]).optional(),
+  provider: z.enum(["lovable", "openai", "groq", "llama", "venice", "gemini", "openrouter", "custom"]).optional(),
   model: z.string().max(200).optional(),
   custom_base_url: z.string().url().nullable().optional(),
   custom_api_key: z.string().max(500).nullable().optional(),
@@ -35,7 +35,7 @@ const SettingsUpdate = z.object({
   system_prompt_override: z.string().max(8000).nullable().optional(),
   hotl_auto_execute: z.boolean().optional(),
   fallback_provider_id: z.string().uuid().nullable().optional(),
-  fallback_provider_kind: z.enum(["groq", "openai", "llama", "venice"]).nullable().optional(),
+  fallback_provider_kind: z.enum(["groq", "openai", "llama", "venice", "gemini", "openrouter"]).nullable().optional(),
 });
 
 
