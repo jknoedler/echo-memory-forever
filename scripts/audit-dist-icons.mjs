@@ -24,6 +24,7 @@ const ROOT = process.cwd();
 // a plain vite build emits to dist. We accept whichever exists.
 const CANDIDATES = [
   { root: join(ROOT, ".output", "public"), label: ".output/public" },
+  { root: join(ROOT, "dist", "client"),    label: "dist/client" },
   { root: join(ROOT, "dist"),              label: "dist" },
 ];
 
