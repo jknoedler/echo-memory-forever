@@ -105,6 +105,8 @@ export const listEnvProviders = createServerFn({ method: "GET" })
       groq: !!process.env.GROQ_API_KEY,
       llama: !!process.env.LLAMA_API_KEY,
       venice: !!process.env.VENICE_API_KEY,
+      gemini: !!process.env.GEMINI_API_KEY,
+      openrouter: !!process.env.OPENROUTER_API_KEY,
     };
   });
 
