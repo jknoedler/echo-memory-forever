@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Brain, ChevronLeft, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
 import { BrandClock } from "@/components/brand-clock";
