@@ -23,15 +23,19 @@ export type AccentPalette = {
   swatch: string;
 };
 
+// NOTE: `swatch` is a *preview* color shown in the settings picker only.
+// It's intentionally lighter & more saturated than the applied background so
+// users can actually tell the dark tones apart. The real surface is built
+// from bgL/hue/chroma in applyPalettes().
 export const BG_PALETTES: BgPalette[] = [
-  { id: "void", label: "Void", bgL: 0.135, hue: 80, chroma: 0.006, swatch: "oklch(0.135 0.006 80)" },
-  { id: "obsidian", label: "Obsidian", bgL: 0.13, hue: 0, chroma: 0.002, swatch: "oklch(0.13 0.002 0)" },
-  { id: "espresso", label: "Espresso", bgL: 0.145, hue: 40, chroma: 0.012, swatch: "oklch(0.145 0.012 40)" },
-  { id: "slate", label: "Slate", bgL: 0.16, hue: 235, chroma: 0.012, swatch: "oklch(0.16 0.012 235)" },
-  { id: "moss", label: "Moss", bgL: 0.15, hue: 145, chroma: 0.012, swatch: "oklch(0.15 0.012 145)" },
-  { id: "plum", label: "Plum", bgL: 0.145, hue: 320, chroma: 0.014, swatch: "oklch(0.145 0.014 320)" },
-  { id: "bone", label: "Bone", bgL: 0.965, hue: 80, chroma: 0.008, swatch: "oklch(0.965 0.008 80)" },
-  { id: "mist", label: "Mist", bgL: 0.96, hue: 235, chroma: 0.008, swatch: "oklch(0.96 0.008 235)" },
+  { id: "void", label: "Void", bgL: 0.135, hue: 80, chroma: 0.006, swatch: "oklch(0.32 0.015 80)" },
+  { id: "obsidian", label: "Obsidian", bgL: 0.13, hue: 0, chroma: 0.002, swatch: "oklch(0.30 0.004 0)" },
+  { id: "espresso", label: "Espresso", bgL: 0.145, hue: 40, chroma: 0.012, swatch: "oklch(0.38 0.05 40)" },
+  { id: "slate", label: "Slate", bgL: 0.16, hue: 235, chroma: 0.012, swatch: "oklch(0.38 0.045 235)" },
+  { id: "moss", label: "Moss", bgL: 0.15, hue: 145, chroma: 0.012, swatch: "oklch(0.38 0.05 145)" },
+  { id: "plum", label: "Plum", bgL: 0.145, hue: 320, chroma: 0.014, swatch: "oklch(0.38 0.055 320)" },
+  { id: "bone", label: "Bone", bgL: 0.965, hue: 80, chroma: 0.008, swatch: "oklch(0.94 0.02 80)" },
+  { id: "mist", label: "Mist", bgL: 0.96, hue: 235, chroma: 0.008, swatch: "oklch(0.92 0.025 235)" },
 ];
 
 export const ACCENT_PALETTES: AccentPalette[] = [
