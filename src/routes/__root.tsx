@@ -115,8 +115,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "0 loss archival agentic ai." },
       { property: "og:description", content: "0 loss archival agentic ai." },
       { name: "twitter:description", content: "0 loss archival agentic ai." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/66bd8ed4-d60b-45a5-8987-a835bc3a8fc6" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/66bd8ed4-d60b-45a5-8987-a835bc3a8fc6" },
     ],
     links: [
       {
