@@ -251,6 +251,8 @@ export function ModelPicker() {
   const envGroqActive = !activeId && providerKind === "groq";
   const envLlamaActive = !activeId && providerKind === "llama";
   const envVeniceActive = !activeId && providerKind === "venice";
+  const envGeminiActive = !activeId && providerKind === "gemini";
+  const envOpenRouterActive = !activeId && providerKind === "openrouter";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
   const label = activeId
@@ -263,7 +265,11 @@ export function ModelPicker() {
           ? `Llama · ${settingsQ.data?.model || "Llama-3.3-70B-Instruct"}`
           : envVeniceActive
             ? `Venice · ${settingsQ.data?.model || "venice-uncensored"}`
-            : "Auto (recommended)";
+            : envGeminiActive
+              ? `Gemini · ${settingsQ.data?.model || "gemini-2.5-flash"}`
+              : envOpenRouterActive
+                ? `OpenRouter · ${settingsQ.data?.model || "meta-llama/llama-3.3-70b-instruct"}`
+                : "Auto (recommended)";
 
 
   const connectedByCat = new Map(
@@ -290,6 +296,24 @@ export function ModelPicker() {
       provider_id: null,
       provider_kind: "groq",
       model: "llama-3.3-70b-versatile",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvOpenRouter() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "openrouter",
+      model: "meta-llama/llama-3.3-70b-instruct",
+    });
+    setOpen(false);
+  }
+
+  function pickEnvGemini() {
+    activateM.mutate({
+      provider_id: null,
+      provider_kind: "gemini",
+      model: "gemini-2.5-flash",
     });
     setOpen(false);
   }
@@ -354,8 +378,77 @@ export function ModelPicker() {
                 DED picks the best model for the moment.
               </span>
             </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && <Check className="h-3.5 w-3.5 text-primary" />}
+            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && !envGeminiActive && !envOpenRouterActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          {envQ.data?.groq && !connectedByCat.get("groq") && (
+            <button
+              type="button"
+              onClick={pickEnvGroq}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envGroqActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Groq (project key)</span>
+                <span className="block text-[10px] truncate">
+                  llama-3.3-70b-versatile · hosted Llama
+                </span>
+              </span>
+              {envGroqActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
+          {envQ.data?.openrouter && !connectedByCat.get("openrouter") && (
+            <button
+              type="button"
+              onClick={pickEnvOpenRouter}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envOpenRouterActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">OpenRouter (project key)</span>
+                <span className="block text-[10px] truncate">
+                  meta-llama/llama-3.3-70b-instruct
+                </span>
+              </span>
+              {envOpenRouterActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
+          {envQ.data?.gemini && (
+            <button
+              type="button"
+              onClick={pickEnvGemini}
+              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                envGeminiActive ? "text-foreground" : "text-muted-foreground"
+              }`}
+            >
+              <span className="min-w-0">
+                <span className="block font-medium truncate">Gemini (project key)</span>
+                <span className="block text-[10px] truncate">
+                  gemini-2.5-flash · stable fallback
+                </span>
+              </span>
+              {envGeminiActive ? (
+                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+              ) : (
+                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                  Ready
+                </span>
+              )}
+            </button>
+          )}
           {envQ.data?.venice && (
             <button
               type="button"
@@ -395,29 +488,6 @@ export function ModelPicker() {
                 </span>
               </span>
               {envLlamaActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
-          {envQ.data?.groq && !connectedByCat.get("groq") && (
-            <button
-              type="button"
-              onClick={pickEnvGroq}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envGroqActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">Groq (project key)</span>
-                <span className="block text-[10px] truncate">
-                  llama-3.3-70b-versatile · uses GROQ_API_KEY
-                </span>
-              </span>
-              {envGroqActive ? (
                 <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
               ) : (
                 <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
