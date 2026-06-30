@@ -14,8 +14,22 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
-      # No bun install needed — both audits are pure-Node scripts with no deps.
-      - name: Brand audit (no stray "Mement0" in user-facing UI)
+      # Source-level audits — pure-Node, no install needed.
+      - name: Brand audit (no stray "Mement0", every product meta uses MementØ)
         run: node scripts/audit-branding.mjs
-      - name: Icon audit (favicon / apple-touch-icon / og:image)
+      - name: Icon audit — source references (__root.tsx)
         run: node scripts/audit-icons.mjs
+
+      # Build the app once and reuse the output for the dist + playwright checks.
+      - name: Install deps
+        run: bun install --frozen-lockfile
+      - name: Build
+        run: bun run vite build
+      - name: Icon audit — built bundle (.output/public / dist)
+        run: node scripts/audit-dist-icons.mjs
+
+      # Playwright end-to-end icon check against the running preview.
+      - name: Install Playwright Chromium
+        run: bunx playwright install --with-deps chromium
+      - name: Icon playwright check (200 + content-type + dimensions)
+        run: node scripts/check-icons-playwright.mjs
