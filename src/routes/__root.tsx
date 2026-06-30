@@ -13,8 +13,14 @@ import { ThemeProvider } from "@/lib/theme";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
-import brandLogo from "@/assets/mement0-logo.png.asset.json";
-const brandLogoUrl = brandLogo.url;
+
+// Properly-sized icon assets live in `public/` and are served at their
+// literal paths. Variants are generated from a single brand mark source by
+// scripts/regen-icons.mjs — keep them in lockstep with the audit budget.
+const FAVICON_32 = "/favicon-32.png";
+const FAVICON_48 = "/favicon-48.png";
+const APPLE_TOUCH_ICON = "/apple-touch-icon.png";
+const OG_IMAGE = "/og-image.png";
 
 function NotFoundComponent() {
   return (
@@ -96,18 +102,21 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
           "A lifelong AI memory and agentic OS. 0 loss. Your archive, eternal.",
       },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: brandLogoUrl },
-      { name: "twitter:card", content: "summary" },
-      { name: "twitter:image", content: brandLogoUrl },
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: OG_IMAGE },
     ],
     links: [
       {
         rel: "stylesheet",
         href: appCss,
       },
-      { rel: "icon", type: "image/png", href: brandLogoUrl },
-      { rel: "shortcut icon", type: "image/png", href: brandLogoUrl },
-      { rel: "apple-touch-icon", href: brandLogoUrl },
+      { rel: "icon", type: "image/png", sizes: "32x32", href: FAVICON_32 },
+      { rel: "icon", type: "image/png", sizes: "48x48", href: FAVICON_48 },
+      { rel: "shortcut icon", type: "image/png", href: FAVICON_32 },
+      { rel: "apple-touch-icon", sizes: "180x180", href: APPLE_TOUCH_ICON },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
