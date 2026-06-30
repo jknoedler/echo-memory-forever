@@ -1,6 +1,6 @@
 // Customizable color palettes for Mement0.
 // Backgrounds = neutral, faded, low-chroma surfaces.
-// Accents = muted jewel tones in the amber family.
+// Accents = muted jewel tones — obsidian-purple family (no amber).
 
 export type BgPalette = {
   id: string;
