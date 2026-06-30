@@ -52,16 +52,16 @@ export type PageMetaInput = {
  * no-op because TanStack dedupes meta by name/property.
  */
 export function shareImageMeta(): MetaEntry[] {
+  // NOTE: og:image and twitter:image are intentionally omitted here.
+  // The publish pipeline auto-injects them into __root.tsx with the latest
+  // preview screenshot. Emitting them from our own meta caused duplicates
+  // and "unresolved reference" build failures. Leave injection as the sole
+  // source so there's always exactly one of each tag.
   return [
-    { property: "og:image", content: BRAND.ogImage.path },
-    { property: "og:image:width", content: BRAND.ogImage.width },
-    { property: "og:image:height", content: BRAND.ogImage.height },
-    { property: "og:image:type", content: BRAND.ogImage.type },
-    { property: "og:image:alt", content: BRAND.ogImage.alt },
-    { name: "twitter:image", content: BRAND.ogImage.path },
     { name: "twitter:card", content: "summary_large_image" },
   ];
 }
+
 
 /** Shared page-level title / description metadata. */
 export function pageMeta(input: PageMetaInput = {}): MetaEntry[] {
