@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "build": "node scripts/audit-branding.mjs && vite build",
-    "build:dev": "node scripts/audit-branding.mjs && vite build --mode development",
+    "build": "node scripts/audit-branding.mjs && node scripts/audit-icons.mjs && vite build",
+    "build:dev": "node scripts/audit-branding.mjs && node scripts/audit-icons.mjs && vite build --mode development",
     "preview": "vite preview",
     "audit:brand": "node scripts/audit-branding.mjs",
+    "audit:icons": "node scripts/audit-icons.mjs",
+    "audit": "node scripts/audit-branding.mjs && node scripts/audit-icons.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
