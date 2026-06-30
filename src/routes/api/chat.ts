@@ -576,7 +576,7 @@ export const Route = createFileRoute("/api/chat")({
             async function runModel(
               model: typeof primaryModel,
               sys: string,
-            ): Promise<{ text: string; failed: boolean }> {
+            ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
               const messageId = crypto.randomUUID();
               const partId = crypto.randomUUID();
               let started = false;
@@ -602,17 +602,19 @@ export const Route = createFileRoute("/api/chat")({
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                return { text, failed: false };
+                return { text, failed: false, creditsOrRateLimit: false };
               } catch (e) {
-                // Close the message cleanly if we started one; otherwise
-                // emit nothing so the client doesn't render an empty bubble.
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                console.error("[chat] model stream failed:", e);
-                return { text, failed: true };
+                const creditsOrRateLimit = isCreditsOrRateLimitError(e);
+                console.error(
+                  `[chat] model stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
+                  e,
+                );
+                return { text, failed: true, creditsOrRateLimit };
               }
             }
 
