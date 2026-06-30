@@ -405,8 +405,11 @@ export const Route = createFileRoute("/api/chat")({
         }
 
         // Resolve primary provider
-        let primaryModel: ReturnType<typeof resolveProvider>["model"];
+        type ChatModel = ReturnType<typeof resolveProvider>["model"];
+        type ModelCandidate = { model: ChatModel; label: string; modelId: string };
+        let primaryModel: ChatModel;
         let primaryLabel = "primary";
+        let primaryModelId = "";
         try {
           const resolved = resolveProvider(cfg, {
             openaiApiKey: process.env.OPENAI_API_KEY,
@@ -417,6 +420,7 @@ export const Route = createFileRoute("/api/chat")({
           });
           primaryModel = resolved.model;
           primaryLabel = resolved.providerName;
+          primaryModelId = resolved.modelId;
         } catch (e) {
           return new Response(
             `Provider error: ${e instanceof Error ? e.message : String(e)}`,
@@ -425,9 +429,19 @@ export const Route = createFileRoute("/api/chat")({
         }
 
 
-        // Resolve fallback provider (best-effort — never blocks primary).
-        let fallbackModel = null as Awaited<ReturnType<typeof resolveProvider>>["model"] | null;
-        let fallbackLabel: string | null = null;
+        // Resolve fallback providers (best-effort — never blocks primary).
+        // One dead upstream should never make chat look dead; we walk every
+        // configured built-in after the preferred fallback and stop at the
+        // first provider that actually streams text.
+        const fallbackCandidates: ModelCandidate[] = [];
+        const seenCandidates = new Set<string>([`${primaryLabel}:${primaryModelId}`]);
+        const addFallbackCandidate = (candidate: ModelCandidate | null) => {
+          if (!candidate) return;
+          const key = `${candidate.label}:${candidate.modelId}`;
+          if (seenCandidates.has(key)) return;
+          seenCandidates.add(key);
+          fallbackCandidates.push(candidate);
+        };
         if (fallbackEnvKind) {
           try {
             const fbModelId =
@@ -448,10 +462,13 @@ export const Route = createFileRoute("/api/chat")({
                 activeProvider: null,
               },
             );
-            fallbackModel = resolvedFb.model;
-            fallbackLabel = fallbackEnvKind;
+            addFallbackCandidate({
+              model: resolvedFb.model,
+              label: resolvedFb.providerName,
+              modelId: resolvedFb.modelId,
+            });
           } catch {
-            fallbackModel = null;
+            /* ignore unavailable preferred fallback */
           }
         } else if (fallbackProvider) {
           try {
@@ -465,12 +482,50 @@ export const Route = createFileRoute("/api/chat")({
                 activeProvider: fallbackProvider,
               },
             );
-            fallbackModel = resolvedFb.model;
-            fallbackLabel = fallbackProvider.catalog_id;
+            addFallbackCandidate({
+              model: resolvedFb.model,
+              label: resolvedFb.providerName,
+              modelId: resolvedFb.modelId,
+            });
           } catch {
-            fallbackModel = null;
+            /* ignore unavailable saved fallback */
           }
         }
+
+        const builtinModelId = (kind: "groq" | "openai" | "llama" | "venice") =>
+          kind === "venice"
+            ? "venice-uncensored"
+            : kind === "groq"
+              ? "llama-3.3-70b-versatile"
+              : kind === "llama"
+                ? "Llama-3.3-70B-Instruct"
+                : "gpt-4o-mini";
+        const addBuiltinFallback = (kind: "groq" | "openai" | "llama" | "venice") => {
+          if (kind === "groq" && !process.env.GROQ_API_KEY) return;
+          if (kind === "openai" && !process.env.OPENAI_API_KEY) return;
+          if (kind === "venice" && !process.env.VENICE_API_KEY) return;
+          if (kind === "llama" && !process.env.LLAMA_API_KEY) return;
+          try {
+            const resolved = resolveProvider(
+              { ...cfg, provider: kind, model: builtinModelId(kind) },
+              {
+                openaiApiKey: process.env.OPENAI_API_KEY,
+                groqApiKey: process.env.GROQ_API_KEY,
+                llamaApiKey: process.env.LLAMA_API_KEY,
+                veniceApiKey: process.env.VENICE_API_KEY,
+                activeProvider: null,
+              },
+            );
+            addFallbackCandidate({
+              model: resolved.model,
+              label: resolved.providerName,
+              modelId: resolved.modelId,
+            });
+          } catch {
+            /* ignore unavailable automatic fallback */
+          }
+        };
+        (["groq", "openai", "venice", "llama"] as const).forEach(addBuiltinFallback);
 
 
         // Save the user message now (before streaming) so it shows up even
