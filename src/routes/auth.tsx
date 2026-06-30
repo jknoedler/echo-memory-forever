@@ -191,7 +191,7 @@ function AuthPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">
-          By continuing you accept that Mement0 will remember.
+          By continuing you accept that MementØ will remember.
         </p>
       </div>
 
