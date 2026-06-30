@@ -15,6 +15,7 @@
     "audit": "node scripts/audit-branding.mjs && node scripts/audit-icons.mjs && node scripts/audit-manifest.mjs && node scripts/audit-dist-icons.mjs",
     "check:icons:playwright": "node scripts/check-icons-playwright.mjs",
     "check:amber:playwright": "node scripts/check-amber-playwright.mjs",
+    "test:calendar-context": "node scripts/test-calendar-context.mjs",
     "lint": "eslint .",
     "format": "prettier --write ."
   },
