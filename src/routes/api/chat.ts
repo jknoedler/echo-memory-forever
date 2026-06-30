@@ -351,7 +351,6 @@ export const Route = createFileRoute("/api/chat")({
         let primaryModel: ReturnType<typeof resolveProvider>["model"];
         try {
           const resolved = resolveProvider(cfg, {
-            lovableApiKey: process.env.LOVABLE_API_KEY,
             openaiApiKey: process.env.OPENAI_API_KEY,
             groqApiKey: process.env.GROQ_API_KEY,
             llamaApiKey: process.env.LLAMA_API_KEY,
@@ -383,7 +382,6 @@ export const Route = createFileRoute("/api/chat")({
             const resolvedFb = resolveProvider(
               { ...cfg, provider: fallbackEnvKind, model: fbModelId },
               {
-                lovableApiKey: process.env.LOVABLE_API_KEY,
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
                 llamaApiKey: process.env.LLAMA_API_KEY,
@@ -401,7 +399,6 @@ export const Route = createFileRoute("/api/chat")({
             const resolvedFb = resolveProvider(
               { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
               {
-                lovableApiKey: process.env.LOVABLE_API_KEY,
                 openaiApiKey: process.env.OPENAI_API_KEY,
                 groqApiKey: process.env.GROQ_API_KEY,
                 llamaApiKey: process.env.LLAMA_API_KEY,
