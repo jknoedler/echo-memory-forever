@@ -115,8 +115,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "description", content: "0 loss archival agentic ai." },
       { property: "og:description", content: "0 loss archival agentic ai." },
       { name: "twitter:description", content: "0 loss archival agentic ai." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3666a555-b5b1-4de7-838b-6883f684e01b/id-preview-02e675b9--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782800579324.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/3666a555-b5b1-4de7-838b-6883f684e01b/id-preview-02e675b9--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782800579324.png" },
     ],
     links: [
       {
