@@ -112,8 +112,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image:type", content: "image/png" },
       { property: "og:image:alt", content: "MementØ — MORE / 0 loss" },
       { name: "twitter:title", content: "MementØ — MØRE" },
-      { name: "description", content: "0 loss archival agentic ai." },
-      { property: "og:description", content: "0 loss archival agentic ai." },
       { name: "twitter:description", content: "0 loss archival agentic ai." },
     ],
     links: [
