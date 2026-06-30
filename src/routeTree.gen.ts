@@ -21,6 +21,7 @@ import { Route as AuthenticatedTasksRouteImport } from './routes/_authenticated/
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedPersonalityRouteImport } from './routes/_authenticated/personality'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
+import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicBiometricsRouteImport } from './routes/api/public/biometrics'
 import { Route as AuthenticatedCThreadIdRouteImport } from './routes/_authenticated/c.$threadId'
@@ -85,6 +86,11 @@ const AuthenticatedLibraryRoute = AuthenticatedLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/personality': typeof AuthenticatedPersonalityRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/events': typeof AuthenticatedEventsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/personality': typeof AuthenticatedPersonalityRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
+  '/_authenticated/events': typeof AuthenticatedEventsRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/personality': typeof AuthenticatedPersonalityRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -158,6 +167,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/app'
+    | '/events'
     | '/library'
     | '/personality'
     | '/settings'
@@ -174,6 +184,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/app'
+    | '/events'
     | '/library'
     | '/personality'
     | '/settings'
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/_authenticated/app'
+    | '/_authenticated/events'
     | '/_authenticated/library'
     | '/_authenticated/personality'
     | '/_authenticated/settings'
@@ -301,6 +313,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedLibraryRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/events': {
+      id: '/_authenticated/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof AuthenticatedEventsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/app': {
       id: '/_authenticated/app'
       path: '/app'
@@ -327,6 +346,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
+  AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedPersonalityRoute: typeof AuthenticatedPersonalityRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
@@ -336,6 +356,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
+  AuthenticatedEventsRoute: AuthenticatedEventsRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedPersonalityRoute: AuthenticatedPersonalityRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
