@@ -47,9 +47,16 @@ export const ACCENT_PALETTES: AccentPalette[] = [
 
 export const DEFAULT_BG = "void";
 export const DEFAULT_ACCENT = "amber";
+export const DEFAULT_LIGHT_BG = "bone";
+export const DEFAULT_DARK_BG = "void";
 
 const BG_KEY = "mement0_bg_palette";
 const ACC_KEY = "mement0_accent_palette";
+
+export function isDarkPalette(id: string) {
+  const p = BG_PALETTES.find((b) => b.id === id) ?? BG_PALETTES[0];
+  return p.bgL < 0.5;
+}
 
 function isDarkBg(p: BgPalette) {
   return p.bgL < 0.5;
