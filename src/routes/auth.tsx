@@ -30,6 +30,13 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
+      // Persist the user's "stay logged in" choice. Supabase auto-refreshes
+      // tokens as long as the session is in storage; if they opt out, we'll
+      // wipe the session when the tab closes.
+      try {
+        localStorage.setItem("mement0:stayLoggedIn", stayLoggedIn ? "1" : "0");
+      } catch {}
+
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -52,6 +59,7 @@ function AuthPage() {
       setBusy(false);
     }
   }
+
 
   async function handleOAuth(provider: "google" | "apple") {
     setBusy(true);
