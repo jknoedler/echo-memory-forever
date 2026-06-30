@@ -19,15 +19,25 @@ import { join, relative } from "node:path";
 
 const ROOT = process.cwd();
 const SRC = join(ROOT, "src");
-const NEEDLE = /Mement0/g;
+// Bare "Mement0" — not followed by an identifier char, so component names
+// like Mement0Logo / Mement0Wordmark / Mement0Mark / Mement0Hero pass.
+const NEEDLE = /Mement0(?![A-Za-z0-9_])/;
 const ALLOW = new Set([
-  "src/lib/brand.ts",
-  "src/components/mement0-logo.tsx",
+  "src/lib/brand.ts",                      // brand token source-of-truth
+  "src/lib/persona.ts",                    // LLM system prompt (read aloud)
+  "src/lib/palette.ts",                    // internal code comment
+  "src/lib/provider-catalog.ts",           // internal copy
+  "src/lib/youtube.ts",                    // outbound User-Agent header
+  "src/components/mement0-logo.tsx",       // references BRAND.name
+  "src/routes/api/chat.ts",                // server-side system prompt
+  "src/routes/api/youtube.ts",             // outbound User-Agent header
+  "src/routes/_authenticated/settings.tsx",// X-Mement0-* HTTP header protocol id
   "src/routeTree.gen.ts",
   "scripts/audit-branding.mjs",
 ]);
 const ALLOW_SUFFIX = [".asset.json"];
-const EXT = /\.(tsx?|jsx?|html|css|md)$/;
+// Only audit files that can render visible text.
+const EXT = /\.(tsx|html)$/;
 
 /** @type {{file:string,line:number,text:string}[]} */
 const hits = [];
@@ -43,9 +53,12 @@ function walk(dir) {
     if (ALLOW.has(rel)) continue;
     if (ALLOW_SUFFIX.some((s) => rel.endsWith(s))) continue;
     const text = readFileSync(full, "utf8");
-    if (!NEEDLE.test(text)) continue;
     text.split("\n").forEach((line, i) => {
-      if (line.includes("Mement0")) hits.push({ file: rel, line: i + 1, text: line.trim() });
+      // Skip pure comment lines and import statements.
+      const trimmed = line.trim();
+      if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+      if (/^\s*import\s/.test(line)) return;
+      if (NEEDLE.test(line)) hits.push({ file: rel, line: i + 1, text: trimmed });
     });
   }
 }
