@@ -1,108 +1,31 @@
-## Actual issue
+## Diagnosis
 
-I traced the path. The old bad metadata is still physically in `src/routes/__root.tsx` after the new helper was added.
+`GET /api/health/ai` (just now, 2026-06-30 15:20 UTC):
+- `llama` → **HTTP 401 unauthorized** ("llama rejected the API key")
+- `groq` → 200 OK
+- `openrouter` → 200 OK
+- `gemini` → 429 rate-limited
+- `openai` → 429 rate-limited
+- `venice` → 402 credits exhausted
 
-Current failure path:
+Since the Auto cascade is `groq → openrouter → gemini → llama → venice → openai`, every chat for the last ~12 hours has been served by **Groq's** `llama-3.3-70b-versatile`. That's the same Llama 3.3 70B model, but Groq hosts it and bills it on Groq's dashboard — not on llama.com. Meta's dashboard correctly shows 0 because Meta's API never accepted a single request from us.
 
-```text
-src/routes/__root.tsx
-  → meta: [...rootMeta(), old inline metadata still here]
-  → old Memento description still here
-  → old external R2 og:image/twitter:image still here
-  → audits fail again
-```
+The 401 means one of:
+1. **Key is wrong / revoked / typo** — most common. `LLAMA_API_KEY` env var doesn't match what's active in your llama.com project.
+2. **Key belongs to a different Meta org/project** than the one you're checking usage on.
+3. **Key was rotated** on Meta's side and the new value was never copied into the project secret.
+4. **Wrong key format** — Meta keys are project-scoped; pasting a preview/test key would also fail auth.
 
-So the previous fix added `brand-meta.ts`, but did not fully delete the old root metadata block. That is why it keeps coming back.
+## What I'll do once you switch to build mode
 
-## Implementation plan
+1. **Confirm the symptom is just the key, not the integration.** Our integration is sound — we send `Authorization: Bearer $LLAMA_API_KEY` to `https://api.llama.com/compat/v1/chat/completions`, which is exactly what Meta's TypeScript OpenAI-compatible docs prescribe. Groq, OpenRouter, and Gemini all use the identical pattern with their own keys and work fine, so the code is not the problem.
+2. **Rotate the key.** Ask you to generate a fresh key at llama.com (Settings → API Keys → Create), then I'll update the `LLAMA_API_KEY` secret with the new value via the secret tool.
+3. **Re-check `/api/health/ai`.** If `llama` flips to 200, the key was the only issue. Send 1 test chat forced onto Llama via the in-chat switch ("switch to meta llama") and confirm a token count appears on llama.com within ~10 min (Meta's dashboard lags).
+4. **If it still 401s after rotation,** the key likely belongs to a different Meta project/org than the dashboard you're viewing. I'll have you double-check the project selector at top of llama.com matches the project the key was created under.
+5. **No code changes** are required for the diagnosis — the routing demotion I did last turn is correct and should stay; direct Llama is the flakiest provider in the cascade and Groq is a healthy substitute when Meta's key is rejected.
 
-### 1. Rewrite the source of truth
+## Technical notes
 
-File: `src/lib/brand-meta.ts`
-
-- Keep one `BRAND` config for name, domain, title, description, share description, and local image path.
-- Keep `BRAND.ogImage.path` local only: `/og-image.png`.
-- Export:
-  - `rootMeta()` for root-only defaults.
-  - `pageMeta()` for page titles/descriptions.
-  - `shareImageMeta()` for OG/Twitter image tags.
-
-### 2. Gut root metadata completely
-
-File: `src/routes/__root.tsx`
-
-- Replace the whole root `meta` array with only:
-  - charset
-  - viewport
-  - `...rootMeta()`
-- Delete every stale inline metadata entry:
-  - `Memento: Your Eternal Archive`
-  - inline `description`
-  - inline `og:description`
-  - inline `twitter:description`
-  - external R2 `og:image`
-  - external R2 `twitter:image`
-  - duplicate `twitter:card`
-  - duplicate `og:type`
-- Keep stylesheet, icon, manifest, and font links untouched.
-
-### 3. Sweep all route heads
-
-Files under `src/routes/**/*.tsx`
-
-- Find every `head:` block.
-- Replace repeated brand metadata with `pageMeta()` / `BRAND` helpers.
-- Ensure leaf routes use self-referencing `canonical` and `og:url` where present.
-- Do not inline external share images anywhere.
-
-### 4. Rewrite the share-image audit so this exact bug cannot pass
-
-File: `scripts/test-share-images.mjs`
-
-- Scan all `src/**/*.{ts,tsx,mts,cts}`.
-- Fail on any `og:image` or `twitter:image` containing `http://` or `https://`.
-- Fail on any external URL within the same object/nearby text as `og:image` or `twitter:image`.
-- Fail on inline share-image metadata outside `src/lib/brand-meta.ts` unless it is a local `/public` path.
-- Print exact file and line number.
-
-### 5. Tighten icon audit duplicate detection
-
-File: `scripts/audit-icons.mjs`
-
-- Resolve canonical share image from `brand-meta.ts`.
-- Fail if `__root.tsx` imports `rootMeta()` but also defines direct `og:image` or `twitter:image` tags.
-- Fail on duplicate share-image refs.
-- Fail external share-image URLs before any asset checks.
-
-### 6. Tighten branding audit wording and stale-copy detection
-
-File: `scripts/audit-branding.mjs`
-
-- Fail on stale `Memento:` metadata copy.
-- Keep allowing internal identifiers like `Mement0Logo`.
-- Change remediation text to: remove stale metadata or move intentional copy to `src/lib/brand-meta.ts`; do not allowlist stale root metadata.
-
-### 7. Verify the entire path
-
-Run/confirm:
-
-```text
-rg "r2.dev|Memento: Your Eternal Archive|og:image.*https|twitter:image.*https" src scripts
-node scripts/audit-branding.mjs
-node scripts/test-share-images.mjs
-node scripts/audit-icons.mjs
-```
-
-Then confirm `package.json` still gates build with those audits before Vite.
-
-## Expected result
-
-There will be exactly one legal source for OG/Twitter images: `src/lib/brand-meta.ts` pointing at local `/og-image.png`. If an external preview URL or stale root metadata is pasted again, the build fails immediately with the exact file and line.
-
-<presentation-actions>
-  <presentation-open-history>View History</presentation-open-history>
-</presentation-actions>
-
-<presentation-actions>
-<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
-</presentation-actions>
+- Meta's usage dashboard is delayed; even a working key won't show tokens immediately. Give it 10-30 min after a successful 200.
+- Groq's `llama-3.3-70b-versatile` is functionally the same weights as Meta's `Llama-3.3-70B-Instruct`, just hosted by Groq. If you only care about the model behavior, you're already using it. If you specifically want billing to land on llama.com, the key has to authenticate.
+- Yes, we're TypeScript — pick TypeScript when their docs ask.
