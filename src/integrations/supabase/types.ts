@@ -41,6 +41,51 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_debug_payloads: {
+        Row: {
+          created_at: string
+          events_block: string | null
+          events_count: number
+          events_newest: string | null
+          events_oldest: string | null
+          id: string
+          retried: boolean
+          stale_events_count: number
+          system_prompt: string
+          thread_id: string
+          user_id: string
+          validator_status: string | null
+        }
+        Insert: {
+          created_at?: string
+          events_block?: string | null
+          events_count?: number
+          events_newest?: string | null
+          events_oldest?: string | null
+          id?: string
+          retried?: boolean
+          stale_events_count?: number
+          system_prompt: string
+          thread_id: string
+          user_id: string
+          validator_status?: string | null
+        }
+        Update: {
+          created_at?: string
+          events_block?: string | null
+          events_count?: number
+          events_newest?: string | null
+          events_oldest?: string | null
+          id?: string
+          retried?: boolean
+          stale_events_count?: number
+          system_prompt?: string
+          thread_id?: string
+          user_id?: string
+          validator_status?: string | null
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           all_day: boolean
