@@ -17,6 +17,8 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [stayLoggedIn, setStayLoggedIn] = useState(true);
+
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -28,6 +30,13 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
+      // Persist the user's "stay logged in" choice. Supabase auto-refreshes
+      // tokens as long as the session is in storage; if they opt out, we'll
+      // wipe the session when the tab closes.
+      try {
+        localStorage.setItem("mement0:stayLoggedIn", stayLoggedIn ? "1" : "0");
+      } catch {}
+
       if (mode === "signup") {
         const { error } = await supabase.auth.signUp({
           email,
@@ -50,6 +59,7 @@ function AuthPage() {
       setBusy(false);
     }
   }
+
 
   async function handleOAuth(provider: "google" | "apple") {
     setBusy(true);
@@ -134,6 +144,16 @@ function AuthPage() {
               />
             </Field>
 
+            <label className="flex items-center gap-2 text-xs text-muted-foreground select-none cursor-pointer">
+              <input
+                type="checkbox"
+                checked={stayLoggedIn}
+                onChange={(e) => setStayLoggedIn(e.target.checked)}
+                className="h-4 w-4 accent-primary cursor-pointer"
+              />
+              Stay logged in
+            </label>
+
             <button
               type="submit"
               disabled={busy}
@@ -142,6 +162,7 @@ function AuthPage() {
               {busy ? "…" : mode === "signup" ? "Create archive" : "Open archive"}
             </button>
           </form>
+
 
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-border" />
