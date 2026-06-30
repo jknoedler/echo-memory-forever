@@ -64,8 +64,10 @@ function parseIconRefs() {
   const refs = [];
 
   // links: { rel: "icon" | "apple-touch-icon" | "shortcut icon", href: <expr> }
+  const ICON_RELS = new Set(["icon", "shortcut icon", "apple-touch-icon", "mask-icon", "fluid-icon"]);
   const linkRe = /\{\s*rel:\s*["']([^"']+)["'][^}]*?href:\s*([A-Za-z_][\w.]*)/g;
   for (const m of src.matchAll(linkRe)) {
+    if (!ICON_RELS.has(m[1])) continue;
     refs.push({ role: `link:${m[1]}`, href: resolveIdent(src, m[2]) });
   }
   // meta og:image / twitter:image with content: <expr>
