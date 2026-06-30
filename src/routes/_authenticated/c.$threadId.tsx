@@ -99,8 +99,15 @@ function ChatWindow({
   initialMessages: UIMessage[];
 }) {
   const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
+    () => {
+      // Snapshot the user's IANA timezone once per mount. The server uses it
+      // to render an accurate wall-clock + Pacific anchor into the system
+      // prompt so the model stops guessing what time it is.
+      let tz = "America/Los_Angeles";
+      try {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+      } catch {}
+      return new DefaultChatTransport({
         api: "/api/chat",
         // Fetch a fresh access token on every send. Supabase tokens expire
         // after ~1h; capturing once on mount caused 401s mid-conversation.
@@ -109,8 +116,9 @@ function ChatWindow({
           const t = data.session?.access_token ?? token;
           return { Authorization: `Bearer ${t}` };
         },
-        body: { threadId },
-      }),
+        body: { threadId, tz },
+      });
+    },
     [threadId, token],
   );
 

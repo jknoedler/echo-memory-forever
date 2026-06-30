@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
+import { BRAND, brandFontStyle } from "@/lib/brand";
 
 /**
  * The "slashed 0" square mark — SVG so it scales and themes cleanly.
+ * All geometry comes from BRAND.mark so the look can be retuned globally.
  */
 export function Mement0Mark({
   className = "",
@@ -10,13 +12,14 @@ export function Mement0Mark({
   className?: string;
   size?: number;
 }) {
+  const m = BRAND.mark;
   return (
     <svg
-      viewBox="0 0 64 64"
+      viewBox={m.viewBox}
       width={size}
       height={size}
       className={className}
-      aria-label="Mement0"
+      aria-label={BRAND.name}
       role="img"
     >
       <rect
@@ -26,8 +29,8 @@ export function Mement0Mark({
         height="56"
         rx="10"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
+        stroke={m.stroke}
+        strokeWidth={m.rectStroke}
       />
       <ellipse
         cx="32"
@@ -35,30 +38,25 @@ export function Mement0Mark({
         rx="10"
         ry="15"
         fill="none"
-        stroke="currentColor"
-        strokeWidth="4"
+        stroke={m.stroke}
+        strokeWidth={m.ovalStroke}
       />
       <line
         x1="18"
         y1="48"
         x2="46"
         y2="16"
-        stroke="currentColor"
-        strokeWidth="4"
+        stroke={m.stroke}
+        strokeWidth={m.slashStroke}
         strokeLinecap="round"
       />
     </svg>
   );
 }
 
-const bodoni = {
-  fontFamily: '"Bodoni Moda", "Bodoni 72", "Didot", "GFS Didot", serif',
-} as const;
-
 /**
- * Inline wordmark: "Mement" in foreground + slashed-Ø in foreground.
- * Use this anywhere you'd otherwise write "Mement0" as text — keeps the
- * branding uniform (no amber/yellow, always the slashed-0 glyph).
+ * Inline wordmark: "Mement" + slashed-Ø, both in the current text color.
+ * Use this anywhere you'd otherwise write "Mement0" as text.
  */
 export function Mement0Wordmark({
   className = "",
@@ -68,8 +66,9 @@ export function Mement0Wordmark({
   as?: "span" | "h1" | "h2" | "p" | "div";
 }) {
   return (
-    <Tag className={className} style={bodoni}>
-      Mement<span style={{ fontWeight: 400 }}>&Oslash;</span>
+    <Tag className={className} style={brandFontStyle}>
+      {BRAND.textPrefix}
+      <span style={{ fontWeight: BRAND.oWeight }}>{BRAND.oGlyph}</span>
     </Tag>
   );
 }
@@ -77,11 +76,7 @@ export function Mement0Wordmark({
 /**
  * Compact header lockup: slashed-0 mark + text wordmark.
  */
-export function Mement0Logo({
-  to = "/" as string,
-}: {
-  to?: string;
-}) {
+export function Mement0Logo({ to = "/" as string }: { to?: string }) {
   return (
     <Link to={to} className="group inline-flex items-center gap-2">
       <Mement0Mark size={24} className="text-foreground" />
@@ -90,43 +85,52 @@ export function Mement0Logo({
   );
 }
 
-
 /**
- * The full brand lockup — black / white, Bodoni, with slashed-Ø.
+ * The full brand lockup — outlined "Mement" + solid Ø + tagline.
  * Used on landing + auth hero.
  */
 export function Mement0Hero({ className = "" }: { className?: string }) {
+  const h = BRAND.hero;
   return (
     <div
       className={`flex flex-col items-center justify-center ${className}`}
-      aria-label="Mement\u00d8 — MORE"
+      aria-label={`${BRAND.name} — ${BRAND.tagline}`}
     >
-      <div className="leading-none" style={{ ...bodoni, fontWeight: 700, fontSize: "clamp(4rem, 18vw, 9rem)", letterSpacing: "-0.02em" }}>
+      <div
+        className="leading-none"
+        style={{
+          ...brandFontStyle,
+          fontWeight: BRAND.prefixWeight,
+          fontSize: h.sizeClamp,
+          letterSpacing: "-0.02em",
+        }}
+      >
         <span
           style={{
-            color: "black",
-            WebkitTextStroke: "1px white",
-            textShadow: "0 0 1px white",
+            color: h.prefixFill,
+            WebkitTextStroke: `${h.prefixStrokeWidth} ${h.prefixStrokeColor}`,
+            textShadow: `0 0 1px ${h.prefixStrokeColor}`,
           }}
         >
-          Mement
+          {BRAND.textPrefix}
         </span>
-        <span style={{ fontWeight: 400, color: "white" }}>&Oslash;</span>
+        <span style={{ fontWeight: BRAND.oWeight, color: h.oFill }}>
+          {BRAND.oGlyph}
+        </span>
       </div>
       <div
         className="mt-3 text-foreground"
         style={{
-          ...bodoni,
+          ...brandFontStyle,
           fontWeight: 400,
           fontStyle: "italic",
-          fontSize: "clamp(1rem, 4vw, 1.5rem)",
-          letterSpacing: "0.35em",
+          fontSize: h.taglineSizeClamp,
+          letterSpacing: h.taglineTracking,
           textTransform: "uppercase",
         }}
       >
-        More
+        {BRAND.tagline}
       </div>
     </div>
   );
 }
-
