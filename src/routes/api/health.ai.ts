@@ -7,7 +7,7 @@
 
 import { createFileRoute } from "@tanstack/react-router";
 
-type ProviderKind = "groq" | "openai" | "venice" | "llama";
+type ProviderKind = "groq" | "openai" | "venice" | "llama" | "gemini" | "openrouter";
 
 type ProviderStatus = {
   provider: ProviderKind;
@@ -38,6 +38,16 @@ const ENDPOINTS: Record<ProviderKind, { url: string; model: string; envVar: stri
     url: "https://api.llama.com/compat/v1/chat/completions",
     model: "Llama-3.3-70B-Instruct",
     envVar: "LLAMA_API_KEY",
+  },
+  gemini: {
+    url: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    model: "gemini-2.5-flash",
+    envVar: "GEMINI_API_KEY",
+  },
+  openrouter: {
+    url: "https://openrouter.ai/api/v1/chat/completions",
+    model: "meta-llama/llama-3.3-70b-instruct",
+    envVar: "OPENROUTER_API_KEY",
   },
 };
 
