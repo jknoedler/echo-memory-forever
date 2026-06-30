@@ -1,0 +1,21 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  audit:
+    name: Brand + icon audits
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      # No bun install needed — both audits are pure-Node scripts with no deps.
+      - name: Brand audit (no stray "Mement0" in user-facing UI)
+        run: node scripts/audit-branding.mjs
+      - name: Icon audit (favicon / apple-touch-icon / og:image)
+        run: node scripts/audit-icons.mjs
