@@ -562,7 +562,7 @@ function ChatWindow({
               placeholder={recording ? "Listening…" : "Speak. The archive is listening."}
               rows={1}
               disabled={recording || transcribing}
-              className="flex-1 resize-none rounded-md border border-border bg-background px-4 py-3 text-sm outline-none focus:border-primary disabled:opacity-60"
+              className="flex-1 resize-none rounded-md border border-border bg-background px-4 py-3 text-base md:text-sm outline-none focus:border-primary disabled:opacity-60"
               style={{ maxHeight: 240 }}
             />
             <button
