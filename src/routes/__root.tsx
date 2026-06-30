@@ -136,6 +136,8 @@ function RootComponent() {
 
   useEffect(() => {
     let mounted = true;
+    let unsub: (() => void) | undefined;
+    let onHide: (() => void) | undefined;
     import("@/integrations/supabase/client").then(({ supabase }) => {
       if (!mounted) return;
       const { data: sub } = supabase.auth.onAuthStateChange((event) => {
@@ -143,12 +145,30 @@ function RootComponent() {
         router.invalidate();
         if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
       });
-      return () => sub.subscription.unsubscribe();
+      unsub = () => sub.subscription.unsubscribe();
+
+      // Honor the "Stay logged in" preference. If unchecked, end the session
+      // when the tab is hidden/closed so it doesn't persist on this device.
+      onHide = () => {
+        try {
+          if (localStorage.getItem("mement0:stayLoggedIn") === "0" && document.visibilityState === "hidden") {
+            supabase.auth.signOut();
+          }
+        } catch {}
+      };
+      window.addEventListener("pagehide", onHide);
+      document.addEventListener("visibilitychange", onHide);
     });
     return () => {
       mounted = false;
+      unsub?.();
+      if (onHide) {
+        window.removeEventListener("pagehide", onHide);
+        document.removeEventListener("visibilitychange", onHide);
+      }
     };
   }, [router, queryClient]);
+
 
   return (
     <QueryClientProvider client={queryClient}>
