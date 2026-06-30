@@ -297,7 +297,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <div className="flex items-center gap-2">
-            <BrandClock />
+            <BrandClock className="sr-only" />
             <button
               type="button"
               onClick={() => createM.mutate()}

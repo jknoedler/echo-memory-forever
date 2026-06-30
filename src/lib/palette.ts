@@ -39,18 +39,18 @@ export const BG_PALETTES: BgPalette[] = [
 ];
 
 export const ACCENT_PALETTES: AccentPalette[] = [
-  { id: "amber", label: "Amber", L: 0.74, C: 0.12, H: 75, swatch: "oklch(0.74 0.12 75)" },
-  { id: "ember", label: "Ember", L: 0.68, C: 0.13, H: 45, swatch: "oklch(0.68 0.13 45)" },
-  { id: "rose", label: "Rose", L: 0.72, C: 0.10, H: 20, swatch: "oklch(0.72 0.10 20)" },
-  { id: "clay", label: "Clay", L: 0.66, C: 0.09, H: 35, swatch: "oklch(0.66 0.09 35)" },
-  { id: "sand", label: "Sand", L: 0.80, C: 0.07, H: 85, swatch: "oklch(0.80 0.07 85)" },
+  { id: "obsidian", label: "Obsidian", L: 0.60, C: 0.15, H: 295, swatch: "oklch(0.60 0.15 295)" },
+  { id: "violet", label: "Violet", L: 0.62, C: 0.17, H: 285, swatch: "oklch(0.62 0.17 285)" },
+  { id: "orchid", label: "Orchid", L: 0.66, C: 0.13, H: 320, swatch: "oklch(0.66 0.13 320)" },
+  { id: "indigo", label: "Indigo", L: 0.55, C: 0.16, H: 270, swatch: "oklch(0.55 0.16 270)" },
+  { id: "plum", label: "Plum", L: 0.52, C: 0.13, H: 310, swatch: "oklch(0.52 0.13 310)" },
   { id: "sage", label: "Sage", L: 0.72, C: 0.07, H: 140, swatch: "oklch(0.72 0.07 140)" },
   { id: "sky", label: "Sky", L: 0.74, C: 0.08, H: 230, swatch: "oklch(0.74 0.08 230)" },
   { id: "lilac", label: "Lilac", L: 0.72, C: 0.08, H: 300, swatch: "oklch(0.72 0.08 300)" },
 ];
 
 export const DEFAULT_BG = "void";
-export const DEFAULT_ACCENT = "amber";
+export const DEFAULT_ACCENT = "obsidian";
 export const DEFAULT_LIGHT_BG = "bone";
 export const DEFAULT_DARK_BG = "void";
 
