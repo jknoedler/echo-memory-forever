@@ -14,13 +14,23 @@ jobs:
         with:
           bun-version: latest
 
-      # Source-level audits — pure-Node, no install needed.
-      - name: Brand audit (no stray "Mement0")
-        run: node scripts/audit-branding.mjs
-      - name: Icon audit — source references (__root.tsx)
+      # Source-level audits — pure-Node, no install needed. Each step
+      # exits non-zero with actionable remediation; if any of these fail
+      # the build stops here and the message tells you what to change.
+      - name: Brand audit — no stray "Mement0", every product mention uses MementØ
+        run: |
+          node scripts/audit-branding.mjs || {
+            echo "::error::Brand audit failed. Update src/lib/brand-meta.ts or the offending file, or add the path to ALLOW in scripts/audit-branding.mjs if intentional.";
+            exit 1;
+          }
+      - name: Share-image audit — og:image / twitter:image must come from brand-meta.ts
+        run: |
+          node scripts/test-share-images.mjs || {
+            echo "::error::Share-image audit failed. Edit src/lib/brand-meta.ts BRAND.ogImage.path (local /public file only). Do NOT inline og:image / twitter:image in any route.";
+            exit 1;
+          }
+      - name: Icon audit — source references (__root.tsx + brand-meta.ts)
         run: node scripts/audit-icons.mjs
-      - name: Share-image test — og:image + twitter:image must be 1 local /public ref
-        run: node scripts/test-share-images.mjs
       - name: Manifest audit — public/manifest.webmanifest
         run: node scripts/audit-manifest.mjs
 
