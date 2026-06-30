@@ -19,6 +19,8 @@ jobs:
         run: node scripts/audit-branding.mjs
       - name: Icon audit — source references (__root.tsx)
         run: node scripts/audit-icons.mjs
+      - name: Manifest audit — public/manifest.webmanifest
+        run: node scripts/audit-manifest.mjs
 
       # Build the app once and reuse the output for the dist + playwright checks.
       - name: Install deps
@@ -27,9 +29,13 @@ jobs:
         run: bun run vite build
       - name: Icon audit — built bundle (.output/public / dist)
         run: node scripts/audit-dist-icons.mjs
+      - name: Manifest audit — built bundle
+        run: node scripts/audit-manifest.mjs
 
-      # Playwright end-to-end icon check against the running preview.
+      # Playwright end-to-end checks against the running preview.
       - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
-      - name: Icon playwright check (200 + content-type + dimensions)
+      - name: Icon playwright check (200 + content-type + dimensions, incl. LinkedIn/social cards)
         run: node scripts/check-icons-playwright.mjs
+      - name: Amber/ember CSS audit (rendered homepage)
+        run: node scripts/check-amber-playwright.mjs
