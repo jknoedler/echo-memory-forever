@@ -117,6 +117,25 @@ function parseIconRefs() {
     const href = m[2] ?? resolveIdent(src, m[3]);
     refs.push({ role: `meta:${m[1]}`, href, raw: m[2] ?? m[3] });
   }
+
+  // og:image / twitter:image now come from src/lib/brand-meta.ts via
+  // rootMeta()/shareImageMeta(). If __root.tsx imports rootMeta or
+  // shareImageMeta, synthesize refs from the brand config so this audit
+  // still verifies the file on disk.
+  if (/from\s+["']@\/lib\/brand-meta["']/.test(src)) {
+    const brandFile = join(ROOT, "src/lib/brand-meta.ts");
+    if (existsSync(brandFile)) {
+      const brand = readFileSync(brandFile, "utf8");
+      const pm = /ogImage\s*:\s*\{[^}]*path\s*:\s*["']([^"']+)["']/m.exec(brand);
+      if (pm) {
+        const path = pm[1];
+        if (!refs.some((r) => r.role === "meta:og:image"))
+          refs.push({ role: "meta:og:image", href: path, raw: path });
+        if (!refs.some((r) => r.role === "meta:twitter:image"))
+          refs.push({ role: "meta:twitter:image", href: path, raw: path });
+      }
+    }
+  }
   return refs;
 }
 
