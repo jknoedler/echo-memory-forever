@@ -179,15 +179,19 @@ export const Route = createFileRoute("/api/chat")({
           api_key: string | null;
           default_model: string | null;
         };
-        let fallbackEnvKind: "groq" | "openai" | "llama" | "venice" | null = null;
-        if (settings?.fallback_provider_kind === "venice" && process.env.VENICE_API_KEY) {
-          fallbackEnvKind = "venice";
-        } else if (settings?.fallback_provider_kind === "groq" && process.env.GROQ_API_KEY) {
-          fallbackEnvKind = "groq";
-        } else if (settings?.fallback_provider_kind === "openai" && process.env.OPENAI_API_KEY) {
-          fallbackEnvKind = "openai";
-        } else if (settings?.fallback_provider_kind === "llama" && process.env.LLAMA_API_KEY) {
-          fallbackEnvKind = "llama";
+        type FbKind = "groq" | "openai" | "llama" | "venice" | "gemini" | "openrouter";
+        const FB_ENV: Record<FbKind, string | undefined> = {
+          groq: process.env.GROQ_API_KEY,
+          openai: process.env.OPENAI_API_KEY,
+          llama: process.env.LLAMA_API_KEY,
+          venice: process.env.VENICE_API_KEY,
+          gemini: process.env.GEMINI_API_KEY,
+          openrouter: process.env.OPENROUTER_API_KEY,
+        };
+        let fallbackEnvKind: FbKind | null = null;
+        const requested = settings?.fallback_provider_kind as FbKind | undefined;
+        if (requested && FB_ENV[requested]) {
+          fallbackEnvKind = requested;
         } else if (
           settings?.fallback_provider_id &&
           settings.fallback_provider_id !== settings.active_provider_id
@@ -198,14 +202,12 @@ export const Route = createFileRoute("/api/chat")({
             .eq("id", settings.fallback_provider_id)
             .maybeSingle();
           if (fb) fallbackProvider = fb;
-        } else if (
-          // No explicit fallback configured — default to Venice when the
-          // project key is present. Venice is the house uncensored fallback.
-          !settings?.fallback_provider_kind &&
-          !settings?.fallback_provider_id &&
-          process.env.VENICE_API_KEY
-        ) {
-          fallbackEnvKind = "venice";
+        } else if (!settings?.fallback_provider_kind && !settings?.fallback_provider_id) {
+          // No explicit fallback configured — default to Venice (uncensored
+          // house fallback), then Gemini, then Groq.
+          if (FB_ENV.venice) fallbackEnvKind = "venice";
+          else if (FB_ENV.gemini) fallbackEnvKind = "gemini";
+          else if (FB_ENV.groq) fallbackEnvKind = "groq";
         }
 
 
@@ -404,6 +406,16 @@ export const Route = createFileRoute("/api/chat")({
           console.warn("[chat] failed to persist debug payload:", e);
         }
 
+        // Shared key bundle for every resolveProvider() call.
+        const providerKeys = {
+          openaiApiKey: process.env.OPENAI_API_KEY,
+          groqApiKey: process.env.GROQ_API_KEY,
+          llamaApiKey: process.env.LLAMA_API_KEY,
+          veniceApiKey: process.env.VENICE_API_KEY,
+          geminiApiKey: process.env.GEMINI_API_KEY,
+          openrouterApiKey: process.env.OPENROUTER_API_KEY,
+        };
+
         // Resolve primary provider
         type ChatModel = ReturnType<typeof resolveProvider>["model"];
         type ModelCandidate = { model: ChatModel; label: string; modelId: string };
@@ -411,13 +423,7 @@ export const Route = createFileRoute("/api/chat")({
         let primaryLabel = "primary";
         let primaryModelId = "";
         try {
-          const resolved = resolveProvider(cfg, {
-            openaiApiKey: process.env.OPENAI_API_KEY,
-            groqApiKey: process.env.GROQ_API_KEY,
-            llamaApiKey: process.env.LLAMA_API_KEY,
-            veniceApiKey: process.env.VENICE_API_KEY,
-            activeProvider,
-          });
+          const resolved = resolveProvider(cfg, { ...providerKeys, activeProvider });
           primaryModel = resolved.model;
           primaryLabel = resolved.providerName;
           primaryModelId = resolved.modelId;
@@ -427,7 +433,6 @@ export const Route = createFileRoute("/api/chat")({
             { status: 500 },
           );
         }
-
 
         // Resolve fallback providers (best-effort — never blocks primary).
         // One dead upstream should never make chat look dead; we walk every
@@ -442,25 +447,23 @@ export const Route = createFileRoute("/api/chat")({
           seenCandidates.add(key);
           fallbackCandidates.push(candidate);
         };
+
+        const builtinModelId = (kind: FbKind): string => {
+          switch (kind) {
+            case "venice": return "venice-uncensored";
+            case "groq": return "llama-3.3-70b-versatile";
+            case "llama": return "Llama-3.3-70B-Instruct";
+            case "gemini": return "gemini-2.5-flash";
+            case "openrouter": return "meta-llama/llama-3.3-70b-instruct";
+            case "openai": return "gpt-4o-mini";
+          }
+        };
+
         if (fallbackEnvKind) {
           try {
-            const fbModelId =
-              fallbackEnvKind === "venice"
-                ? "venice-uncensored"
-                : fallbackEnvKind === "groq"
-                  ? "llama-3.3-70b-versatile"
-                  : fallbackEnvKind === "llama"
-                    ? "Llama-3.3-70B-Instruct"
-                    : "gpt-4o-mini";
             const resolvedFb = resolveProvider(
-              { ...cfg, provider: fallbackEnvKind, model: fbModelId },
-              {
-                openaiApiKey: process.env.OPENAI_API_KEY,
-                groqApiKey: process.env.GROQ_API_KEY,
-                llamaApiKey: process.env.LLAMA_API_KEY,
-                veniceApiKey: process.env.VENICE_API_KEY,
-                activeProvider: null,
-              },
+              { ...cfg, provider: fallbackEnvKind, model: builtinModelId(fallbackEnvKind) },
+              { ...providerKeys, activeProvider: null },
             );
             addFallbackCandidate({
               model: resolvedFb.model,
@@ -474,13 +477,7 @@ export const Route = createFileRoute("/api/chat")({
           try {
             const resolvedFb = resolveProvider(
               { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
-              {
-                openaiApiKey: process.env.OPENAI_API_KEY,
-                groqApiKey: process.env.GROQ_API_KEY,
-                llamaApiKey: process.env.LLAMA_API_KEY,
-                veniceApiKey: process.env.VENICE_API_KEY,
-                activeProvider: fallbackProvider,
-              },
+              { ...providerKeys, activeProvider: fallbackProvider },
             );
             addFallbackCandidate({
               model: resolvedFb.model,
@@ -492,29 +489,12 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        const builtinModelId = (kind: "groq" | "openai" | "llama" | "venice") =>
-          kind === "venice"
-            ? "venice-uncensored"
-            : kind === "groq"
-              ? "llama-3.3-70b-versatile"
-              : kind === "llama"
-                ? "Llama-3.3-70B-Instruct"
-                : "gpt-4o-mini";
-        const addBuiltinFallback = (kind: "groq" | "openai" | "llama" | "venice") => {
-          if (kind === "groq" && !process.env.GROQ_API_KEY) return;
-          if (kind === "openai" && !process.env.OPENAI_API_KEY) return;
-          if (kind === "venice" && !process.env.VENICE_API_KEY) return;
-          if (kind === "llama" && !process.env.LLAMA_API_KEY) return;
+        const addBuiltinFallback = (kind: FbKind) => {
+          if (!FB_ENV[kind]) return;
           try {
             const resolved = resolveProvider(
               { ...cfg, provider: kind, model: builtinModelId(kind) },
-              {
-                openaiApiKey: process.env.OPENAI_API_KEY,
-                groqApiKey: process.env.GROQ_API_KEY,
-                llamaApiKey: process.env.LLAMA_API_KEY,
-                veniceApiKey: process.env.VENICE_API_KEY,
-                activeProvider: null,
-              },
+              { ...providerKeys, activeProvider: null },
             );
             addFallbackCandidate({
               model: resolved.model,
@@ -525,7 +505,12 @@ export const Route = createFileRoute("/api/chat")({
             /* ignore unavailable automatic fallback */
           }
         };
-        (["groq", "openai", "venice", "llama"] as const).forEach(addBuiltinFallback);
+        // Walk order: free/fast first → broad catalog → paid → uncensored.
+        (["groq", "gemini", "openrouter", "openai", "venice", "llama"] as const).forEach(
+          addBuiltinFallback,
+        );
+
+
 
 
         // Save the user message now (before streaming) so it shows up even
