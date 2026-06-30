@@ -239,6 +239,29 @@ export const Route = createFileRoute("/api/chat")({
           .map((p) => `- ${p.title}${p.due_at ? ` (due ${p.due_at})` : ""}`)
           .join("\n");
 
+        // Calendar events — user-curated dated milestones. Pull a window
+        // around "now" so the model has both recent history and near-future
+        // commitments without dragging in the entire archive.
+        const nowIso = new Date().toISOString();
+        const past = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
+        const future = new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString();
+        const { data: evRows } = await supabase
+          .from("events")
+          .select("title, notes, occurred_at, all_day")
+          .gte("occurred_at", past)
+          .lte("occurred_at", future)
+          .order("occurred_at", { ascending: false })
+          .limit(50);
+        const eventsBlock = (evRows ?? [])
+          .map((e) => {
+            const when = e.all_day
+              ? new Date(e.occurred_at).toISOString().slice(0, 10)
+              : new Date(e.occurred_at).toISOString();
+            return `- [${when}] ${e.title}${e.notes ? ` — ${e.notes}` : ""}`;
+          })
+          .join("\n");
+        void nowIso;
+
         // Continuity state for this thread
         const { data: contThread } = await supabase
           .from("threads")
