@@ -107,6 +107,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:image:height", content: "630" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "twitter:image", content: OG_IMAGE },
+      // LinkedIn / Slack / Discord / iMessage all read og:image — these
+      // are the explicit hints LinkedIn's post-inspector checks for.
+      { property: "og:image:type", content: "image/png" },
+      { property: "og:image:alt", content: "MementØ — MORE / 0 loss" },
     ],
     links: [
       {
@@ -117,6 +121,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "icon", type: "image/png", sizes: "48x48", href: FAVICON_48 },
       { rel: "shortcut icon", type: "image/png", href: FAVICON_32 },
       { rel: "apple-touch-icon", sizes: "180x180", href: APPLE_TOUCH_ICON },
+      { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

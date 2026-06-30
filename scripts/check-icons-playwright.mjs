@@ -26,15 +26,27 @@ try {
   process.exit(1);
 }
 
-const ICON_RELS = new Set(["icon", "shortcut icon", "apple-touch-icon"]);
-const META_NAMES = new Set(["og:image", "twitter:image"]);
+const ICON_RELS = new Set(["icon", "shortcut icon", "apple-touch-icon", "manifest"]);
+// Social-card metas: og:image (LinkedIn, Slack, Discord, iMessage, Facebook),
+// twitter:image (X), plus explicit LinkedIn / Pinterest hints when present.
+const META_NAMES = new Set([
+  "og:image", "og:image:url", "og:image:secure_url",
+  "twitter:image", "twitter:image:src",
+  "linkedin:image", "thumbnail",
+]);
 
 const TYPES = {
   "icon":             ["image/png","image/svg+xml","image/x-icon","image/vnd.microsoft.icon"],
   "shortcut icon":    ["image/png","image/svg+xml","image/x-icon","image/vnd.microsoft.icon"],
   "apple-touch-icon": ["image/png"],
+  "manifest":         ["application/manifest+json","application/json","text/json"],
   "og:image":         ["image/png","image/jpeg","image/webp"],
+  "og:image:url":     ["image/png","image/jpeg","image/webp"],
+  "og:image:secure_url": ["image/png","image/jpeg","image/webp"],
   "twitter:image":    ["image/png","image/jpeg","image/webp"],
+  "twitter:image:src":["image/png","image/jpeg","image/webp"],
+  "linkedin:image":   ["image/png","image/jpeg","image/webp"],
+  "thumbnail":        ["image/png","image/jpeg","image/webp"],
 };
 
 function pngDims(buf) {
@@ -129,8 +141,13 @@ async function run() {
             errors.push(`${ref.role} ${url} — sizes="${ref.sizes}" but image is ${d.width}x${d.height}`);
           }
         }
-        if (ref.role === "og:image" && (d.width < 600 || d.height < 315)) {
+        if ((ref.role === "og:image" || ref.role === "twitter:image" || ref.role === "linkedin:image")
+            && (d.width < 600 || d.height < 315)) {
           errors.push(`${ref.role} ${url} — ${d.width}x${d.height} smaller than 600x315`);
+        }
+        // LinkedIn recommends 1200x627 (close to og 1.91:1); flag bad ratios.
+        if (ref.role === "og:image" && d.width / d.height < 1.6) {
+          errors.push(`${ref.role} ${url} — aspect ratio ${(d.width/d.height).toFixed(2)} not LinkedIn-friendly (expect ≥1.6)`);
         }
         console.log(`  ✓ ${ref.role.padEnd(18)} ${url} → 200 ${ctype} ${d.width}x${d.height} ${(buf.length/1024).toFixed(1)}KB`);
       } else {

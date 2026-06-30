@@ -5,6 +5,7 @@ import { Brain, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, 
 import { toast } from "sonner";
 import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
 import { BrandClock } from "@/components/brand-clock";
+import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { supabase } from "@/integrations/supabase/client";
 import { createThread, deleteThread, listThreads } from "@/lib/threads.functions";
 
@@ -305,7 +306,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </Link>
 
           <div className="flex items-center gap-2">
-            <BrandClock className="sr-only" />
+            <BrandClock className={FEATURE_FLAGS.showClock ? "" : "sr-only"} />
             <button
               type="button"
               onClick={() => createM.mutate()}
