@@ -59,7 +59,12 @@ function ChatPage() {
     supabase.auth.getSession().then(({ data }) => {
       setToken(data.session?.access_token ?? null);
     });
+    const { data: sub } = supabase.auth.onAuthStateChange((_evt, session) => {
+      setToken(session?.access_token ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
   }, []);
+
 
   const historyQ = useQuery({
     queryKey: ["messages", threadId],
