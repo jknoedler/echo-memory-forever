@@ -18,9 +18,7 @@ export function AppLoading() {
       aria-label="Loading MementØ"
     >
       <Mement0Mark
-        // ~1/3 of the viewport's short edge — clamp keeps it sane on
-        // ultrawide and tiny phones alike.
-        size={0}
+        size={400}
         className="h-[33vmin] w-[33vmin] max-h-[420px] max-w-[420px] text-white animate-pulse"
       />
       <p
