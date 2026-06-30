@@ -1,44 +1,47 @@
 #!/usr/bin/env node
 /**
  * Icon audit — verifies favicon / apple-touch-icon / og:image links in
- * src/routes/__root.tsx resolve to real asset pointers with sane
- * content-types and weights, and that PNG dimensions match the sizes
- * common browsers and iOS/Android home-screens expect.
+ * src/routes/__root.tsx exist on disk and meet the size / content-type /
+ * dimension budgets common browsers, iOS / Android home-screens, and social
+ * crawlers expect.
  *
- * Recommended targets (covers Chrome/Safari/Firefox/Edge + iOS/Android):
- *   - favicon (rel="icon")          → 32x32 or 48x48 PNG/SVG/ICO, <100KB
- *   - apple-touch-icon              → 180x180 PNG, <300KB
- *   - og:image / twitter:image      → ≥1200x630 PNG/JPG, <1MB
+ * Resolves references in two ways:
+ *   1. Literal URL strings ("/favicon-32.png") → public/favicon-32.png
+ *   2. Module identifiers whose const expression is `<asset>.url` and `<asset>`
+ *      imports a `.asset.json` pointer under src/assets/
  *
- * The script reads .asset.json pointers under src/assets/ and decodes PNG
- * width/height from the original_filename + size metadata plus the locally
- * cached binary when present. If only the CDN pointer is available, it
- * still validates content-type and the recorded byte size.
- *
- * Exits non-zero if any required icon is missing or violates a hard limit.
+ * Hard fails (exit 1) on: missing required tag, missing file, wrong
+ * content-type, dimensions outside the per-role range, size over the hard
+ * max, or PNG that can't be decoded.
  */
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, basename } from "node:path";
 
 const ROOT = process.cwd();
 const ROOT_ROUTE = join(ROOT, "src/routes/__root.tsx");
 const ASSETS_DIR = join(ROOT, "src/assets");
+const PUBLIC_DIR = join(ROOT, "public");
 
-/** PNG IHDR decoder — pulls width/height out of the first 24 bytes. */
+const MIME = {
+  ".png":  "image/png",
+  ".jpg":  "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".svg":  "image/svg+xml",
+  ".ico":  "image/x-icon",
+  ".gif":  "image/gif",
+};
+
+/** PNG IHDR decoder — width/height from bytes 16..23 of a PNG. */
 function pngDimensions(buf) {
   if (buf.length < 24) return null;
-  // PNG signature: 89 50 4E 47 0D 0A 1A 0A
-  if (
-    buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47
-  ) return null;
-  const width  = buf.readUInt32BE(16);
-  const height = buf.readUInt32BE(20);
-  return { width, height };
+  if (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47) return null;
+  return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
 }
 
 /** Index every .asset.json under src/assets/ by its CDN url. */
 function indexAssets() {
-  /** @type {Record<string, {file:string, json:any, bin?:Buffer}>} */
+  /** @type {Record<string, {file:string, contentType:string, size:number, bin?:Buffer}>} */
   const byUrl = {};
   if (!existsSync(ASSETS_DIR)) return byUrl;
   const walk = (dir) => {
@@ -47,121 +50,188 @@ function indexAssets() {
       if (statSync(full).isDirectory()) { walk(full); continue; }
       if (!full.endsWith(".asset.json")) continue;
       const json = JSON.parse(readFileSync(full, "utf8"));
-      // Look for a sibling raw file (in case the binary is still on disk).
       const sibling = full.replace(/\.asset\.json$/, "");
       const bin = existsSync(sibling) ? readFileSync(sibling) : undefined;
-      byUrl[json.url] = { file: relative(ROOT, full), json, bin };
+      byUrl[json.url] = {
+        file: relative(ROOT, full),
+        contentType: json.content_type,
+        size: json.size,
+        bin,
+      };
     }
   };
   walk(ASSETS_DIR);
   return byUrl;
 }
 
-/** Parse all link/meta tags in __root.tsx that reference an icon-like URL. */
+/** Resolve an href/content value to a binary on disk plus metadata. */
+function resolveRef(href, assets) {
+  // 1) Literal absolute path served from /public
+  if (href.startsWith("/") && !href.startsWith("/__l5e/")) {
+    const full = join(PUBLIC_DIR, href.replace(/^\/+/, ""));
+    if (!existsSync(full)) return { ok: false, reason: `file not found at public${href}` };
+    const bin = readFileSync(full);
+    const ext = href.toLowerCase().match(/\.[a-z0-9]+$/)?.[0] ?? "";
+    return {
+      ok: true,
+      source: `public${href}`,
+      contentType: MIME[ext] ?? "application/octet-stream",
+      size: bin.length,
+      bin,
+    };
+  }
+  // 2) CDN url backed by a .asset.json under src/assets/
+  const asset = assets[href];
+  if (asset) {
+    return {
+      ok: true,
+      source: asset.file,
+      contentType: asset.contentType,
+      size: asset.size,
+      bin: asset.bin,
+    };
+  }
+  return { ok: false, reason: `unresolved reference (no public file, no asset pointer)` };
+}
+
+/** Parse icon-shaped link/meta tags from __root.tsx. */
 function parseIconRefs() {
   const src = readFileSync(ROOT_ROUTE, "utf8");
-  /** @type {{role:string, href:string}[]} */
+  /** @type {{role:string, href:string, raw:string}[]} */
   const refs = [];
-
-  // links: { rel: "icon" | "apple-touch-icon" | "shortcut icon", href: <expr> }
   const ICON_RELS = new Set(["icon", "shortcut icon", "apple-touch-icon", "mask-icon", "fluid-icon"]);
-  const linkRe = /\{\s*rel:\s*["']([^"']+)["'][^}]*?href:\s*([A-Za-z_][\w.]*)/g;
+
+  const linkRe = /\{\s*rel:\s*["']([^"']+)["'][^}]*?href:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))/g;
   for (const m of src.matchAll(linkRe)) {
     if (!ICON_RELS.has(m[1])) continue;
-    refs.push({ role: `link:${m[1]}`, href: resolveIdent(src, m[2]) });
+    const href = m[2] ?? resolveIdent(src, m[3]);
+    refs.push({ role: `link:${m[1]}`, href, raw: m[2] ?? m[3] });
   }
-  // meta og:image / twitter:image with content: <expr>
-  const metaRe = /property:\s*["'](og:image|twitter:image)["'][^}]*?content:\s*([A-Za-z_][\w.]*)/g;
-  for (const m of src.matchAll(metaRe)) {
-    refs.push({ role: `meta:${m[1]}`, href: resolveIdent(src, m[2]) });
+  const metaPropRe = /property:\s*["'](og:image|twitter:image)["'][^}]*?content:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))/g;
+  for (const m of src.matchAll(metaPropRe)) {
+    const href = m[2] ?? resolveIdent(src, m[3]);
+    refs.push({ role: `meta:${m[1]}`, href, raw: m[2] ?? m[3] });
   }
-  const metaNameRe = /name:\s*["'](twitter:image)["'][^}]*?content:\s*([A-Za-z_][\w.]*)/g;
+  const metaNameRe = /name:\s*["'](twitter:image)["'][^}]*?content:\s*(?:["']([^"']+)["']|([A-Za-z_]\w*))/g;
   for (const m of src.matchAll(metaNameRe)) {
-    refs.push({ role: `meta:${m[1]}`, href: resolveIdent(src, m[2]) });
+    const href = m[2] ?? resolveIdent(src, m[3]);
+    refs.push({ role: `meta:${m[1]}`, href, raw: m[2] ?? m[3] });
   }
   return refs;
 }
 
-/** Best-effort resolution: const X = <something>.url; */
+/** Resolve `const NAME = "literal"` or `const NAME = something.url;`. */
 function resolveIdent(src, name) {
   const re = new RegExp(`const\\s+${name}\\s*=\\s*([^;]+);`);
   const m = src.match(re);
   if (!m) return `<${name}>`;
   const expr = m[1].trim();
-  // brandLogo.url → look up brandLogo import path and read its url field
-  const dotMatch = expr.match(/^(\w+)\.url$/);
-  if (dotMatch) {
-    const importRe = new RegExp(`import\\s+${dotMatch[1]}\\s+from\\s+["']([^"']+)["']`);
-    const im = src.match(importRe);
+  const strLit = expr.match(/^["']([^"']+)["']$/);
+  if (strLit) return strLit[1];
+  const dot = expr.match(/^(\w+)\.url$/);
+  if (dot) {
+    const im = src.match(new RegExp(`import\\s+${dot[1]}\\s+from\\s+["']([^"']+)["']`));
     if (im) {
       const importPath = im[1].replace(/^@\//, "src/");
       const full = join(ROOT, importPath);
-      if (existsSync(full)) {
-        const j = JSON.parse(readFileSync(full, "utf8"));
-        return j.url;
-      }
+      if (existsSync(full)) return JSON.parse(readFileSync(full, "utf8")).url;
     }
   }
   return expr;
 }
 
+/**
+ * Per-role budgets. `dims` is an allow-list of {w,h} pairs (exact match);
+ * `dimsRange` is [{minW,minH,maxW,maxH}]. `types` is the content-type allow-list.
+ */
 const RULES = {
-  "link:icon":              { maxBytes: 200_000, idealW: [32, 48, 64], types: ["image/png", "image/svg+xml", "image/x-icon", "image/vnd.microsoft.icon"] },
-  "link:shortcut icon":     { maxBytes: 200_000, idealW: [32, 48, 64], types: ["image/png", "image/svg+xml", "image/x-icon"] },
-  "link:apple-touch-icon":  { maxBytes: 400_000, idealW: [180],         types: ["image/png"] },
-  "meta:og:image":          { maxBytes: 2_000_000, minW: 600,            types: ["image/png", "image/jpeg", "image/webp"] },
-  "meta:twitter:image":     { maxBytes: 2_000_000, minW: 600,            types: ["image/png", "image/jpeg", "image/webp"] },
+  "link:icon": {
+    types: ["image/png", "image/svg+xml", "image/x-icon"],
+    dims: [{ w: 32, h: 32 }, { w: 48, h: 48 }, { w: 64, h: 64 }, { w: 16, h: 16 }],
+    hardMaxBytes: 100_000,
+  },
+  "link:shortcut icon": {
+    types: ["image/png", "image/svg+xml", "image/x-icon"],
+    dims: [{ w: 32, h: 32 }, { w: 48, h: 48 }, { w: 64, h: 64 }, { w: 16, h: 16 }],
+    hardMaxBytes: 100_000,
+  },
+  "link:apple-touch-icon": {
+    types: ["image/png"],
+    dims: [{ w: 180, h: 180 }, { w: 152, h: 152 }, { w: 167, h: 167 }, { w: 192, h: 192 }],
+    hardMaxBytes: 300_000,
+  },
+  "meta:og:image": {
+    types: ["image/png", "image/jpeg", "image/webp"],
+    dimsRange: { minW: 600, minH: 315, maxW: 4096, maxH: 4096 },
+    // Recommended exact aspect 1.91:1 → 1200x630.
+    preferred: { w: 1200, h: 630 },
+    hardMaxBytes: 1_000_000,
+  },
+  "meta:twitter:image": {
+    types: ["image/png", "image/jpeg", "image/webp"],
+    dimsRange: { minW: 600, minH: 315, maxW: 4096, maxH: 4096 },
+    preferred: { w: 1200, h: 630 },
+    hardMaxBytes: 1_000_000,
+  },
 };
 
-const REQUIRED = ["link:icon", "link:apple-touch-icon", "meta:og:image"];
+const REQUIRED = ["link:icon", "link:apple-touch-icon", "meta:og:image", "meta:twitter:image"];
+
+function checkDims(rule, dims) {
+  if (!dims) return { ok: false, msg: "dimensions could not be decoded" };
+  if (rule.dims) {
+    const hit = rule.dims.find((d) => d.w === dims.width && d.h === dims.height);
+    if (!hit) return { ok: false, msg: `${dims.width}x${dims.height} — expected one of ${rule.dims.map((d) => `${d.w}x${d.h}`).join(", ")}` };
+  }
+  if (rule.dimsRange) {
+    const r = rule.dimsRange;
+    if (dims.width < r.minW || dims.height < r.minH || dims.width > r.maxW || dims.height > r.maxH) {
+      return { ok: false, msg: `${dims.width}x${dims.height} outside ${r.minW}x${r.minH}..${r.maxW}x${r.maxH}` };
+    }
+  }
+  return { ok: true };
+}
 
 function main() {
   const assets = indexAssets();
   const refs = parseIconRefs();
-
-  /** @type {string[]} */
-  const errors = [];
-  /** @type {string[]} */
-  const warnings = [];
+  /** @type {string[]} */ const errors = [];
+  /** @type {string[]} */ const warnings = [];
 
   const present = new Set(refs.map((r) => r.role));
   for (const must of REQUIRED) {
     if (!present.has(must)) errors.push(`missing required tag: ${must}`);
   }
 
-  console.log(`Icon audit — ${refs.length} reference(s) found in src/routes/__root.tsx\n`);
+  console.log(`Icon audit — ${refs.length} reference(s) in src/routes/__root.tsx\n`);
 
   for (const r of refs) {
     const rule = RULES[r.role];
-    const asset = assets[r.href];
-    const label = `${r.role.padEnd(24)} ${r.href}`;
-    if (!asset) {
-      warnings.push(`${label}\n    ↳ no matching .asset.json under src/assets/ (external or unresolved)`);
+    const resolved = resolveRef(r.href, assets);
+    const head = `${r.role.padEnd(24)} ${r.href}`;
+    if (!resolved.ok) {
+      errors.push(`${r.role}: ${resolved.reason}`);
+      console.log(`  ${head}\n    ✗ ${resolved.reason}`);
       continue;
     }
-    const { json, bin } = asset;
-    const dims = bin ? pngDimensions(bin) : null;
-    const info = [
-      `type=${json.content_type}`,
-      `size=${(json.size / 1024).toFixed(1)}KB`,
-      dims ? `${dims.width}x${dims.height}` : "dims=unknown",
-    ].join("  ");
-    console.log(`  ${label}\n    ↳ ${info}`);
+    const dims = resolved.bin ? pngDimensions(resolved.bin) : null;
+    const sizeKB = (resolved.size / 1024).toFixed(1);
+    const dimStr = dims ? `${dims.width}x${dims.height}` : "dims=?";
+    console.log(`  ${head}\n    ↳ ${resolved.source}  type=${resolved.contentType}  size=${sizeKB}KB  ${dimStr}`);
 
-    if (rule) {
-      if (!rule.types.includes(json.content_type)) {
-        errors.push(`${r.role}: content-type ${json.content_type} not allowed (expected ${rule.types.join(", ")})`);
-      }
-      if (rule.maxBytes && json.size > rule.maxBytes) {
-        warnings.push(`${r.role}: ${(json.size / 1024).toFixed(0)}KB exceeds recommended ${(rule.maxBytes / 1024).toFixed(0)}KB — browsers cache this on every page load`);
-      }
-      if (dims) {
-        if (rule.idealW && !rule.idealW.includes(dims.width)) {
-          warnings.push(`${r.role}: ${dims.width}x${dims.height} — common targets are ${rule.idealW.map((w) => `${w}x${w}`).join(" / ")}`);
-        }
-        if (rule.minW && dims.width < rule.minW) {
-          warnings.push(`${r.role}: ${dims.width}x${dims.height} below recommended min width ${rule.minW}`);
-        }
+    if (!rule) continue;
+    if (!rule.types.includes(resolved.contentType)) {
+      errors.push(`${r.role}: content-type ${resolved.contentType} not in [${rule.types.join(", ")}]`);
+    }
+    if (resolved.size > rule.hardMaxBytes) {
+      errors.push(`${r.role}: ${sizeKB}KB exceeds hard budget ${(rule.hardMaxBytes / 1024).toFixed(0)}KB`);
+    }
+    // Dimension check only meaningful for PNG (svg has no IHDR).
+    if (resolved.contentType === "image/png") {
+      const dc = checkDims(rule, dims);
+      if (!dc.ok) errors.push(`${r.role}: ${dc.msg}`);
+      if (rule.preferred && dims && (dims.width !== rule.preferred.w || dims.height !== rule.preferred.h)) {
+        warnings.push(`${r.role}: ${dims.width}x${dims.height} is valid but ${rule.preferred.w}x${rule.preferred.h} is the recommended share aspect (1.91:1)`);
       }
     }
   }
