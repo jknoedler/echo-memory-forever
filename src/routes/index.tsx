@@ -102,7 +102,7 @@ function Landing() {
               }}
               placeholder="prepare to assimilate"
               rows={1}
-              className="flex-1 resize-none bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted-foreground"
+              className="flex-1 resize-none bg-transparent px-3 py-3 text-base md:text-[15px] outline-none placeholder:text-muted-foreground"
               style={{ maxHeight: 240 }}
             />
             <button
