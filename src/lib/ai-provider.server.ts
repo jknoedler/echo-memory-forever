@@ -4,6 +4,7 @@
 // All are spoken to via OpenAI-compatible chat completions, so the
 // resolver only needs baseURL + apiKey + modelId.
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { sanitizeOpenRouterModel } from "./openrouter-free";
 
 export type UserAiConfig = {
   provider: string;
