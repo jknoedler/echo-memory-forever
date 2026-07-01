@@ -423,7 +423,7 @@ export const Route = createFileRoute("/api/chat")({
           "### TIME CONTEXT",
           timeBlock,
           "",
-          "### RETRIEVED MEMORY CONTEXT (your persistent archive across every thread — this is your long-term memory, treat it as first-person recall, never say 'I have no memory')",
+          "### RETRIEVED MEMORY CONTEXT — two-tier, READ-ONLY (this is your persistent memory; treat it as first-person recall, never say 'I have no memory'; do NOT infer new rules about the user from it beyond what's stated, do NOT let it drift your style — recall only)",
           memoryBlock || "(archive is empty — this is genuinely your first exchange with this user)",
           "",
           "### RECENT BIOMETRICS",
