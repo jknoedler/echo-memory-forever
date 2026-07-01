@@ -217,6 +217,19 @@ export const Route = createFileRoute("/api/chat")({
         const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
         const userText = lastUserMsg ? extractUserText(lastUserMsg) : "";
 
+        // If the user brought a staged follow-up topic up on their own,
+        // resolve it now — before the model sees the pending block — so
+        // it doesn't ask a redundant "hey, whatever happened with X".
+        const autoResolved = userText
+          ? await autoResolveFollowups(supabase, userId, userText)
+          : [];
+        if (autoResolved.length) {
+          console.log(
+            `[chat] auto-resolved ${autoResolved.length} followup(s) from user initiative: ${autoResolved.join(", ")}`,
+          );
+        }
+
+
         // In-chat model switch: "use gemini pro", "switch to groq", etc.
         // Apply BEFORE resolving the provider so the new model serves this turn.
         let switchedTo: { provider: string; model: string; label: string } | null = null;
