@@ -62,7 +62,7 @@ export const CATALOG: CatalogEntry[] = [
       "anthropic/claude-sonnet-4.5",
       "openai/gpt-4o",
       "google/gemini-2.5-pro",
-      "meta-llama/llama-3.3-70b-instruct",
+      "meta-llama/llama-3.3-70b-instruct:free",
       "deepseek/deepseek-chat",
     ],
     notes: "Cheapest way to try any model without a separate signup.",

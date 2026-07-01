@@ -495,7 +495,7 @@ export const Route = createFileRoute("/api/chat")({
             case "groq": return "llama-3.3-70b-versatile";
             case "llama": return "Llama-3.3-70B-Instruct";
             case "gemini": return "gemini-2.5-flash";
-            case "openrouter": return "meta-llama/llama-3.3-70b-instruct";
+            case "openrouter": return "meta-llama/llama-3.3-70b-instruct:free";
             case "openai": return "gpt-4o-mini";
           }
         };

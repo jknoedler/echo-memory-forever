@@ -71,7 +71,7 @@ const BUILTIN_CONFIG: Record<
   },
   openrouter: {
     baseURL: "https://openrouter.ai/api/v1",
-    defaultModel: "meta-llama/llama-3.3-70b-instruct",
+    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
     envName: "OPENROUTER_API_KEY",
   },
 };

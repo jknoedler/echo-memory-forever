@@ -46,7 +46,7 @@ const ENDPOINTS: Record<ProviderKind, { url: string; model: string; envVar: stri
   },
   openrouter: {
     url: "https://openrouter.ai/api/v1/chat/completions",
-    model: "meta-llama/llama-3.3-70b-instruct",
+    model: "meta-llama/llama-3.3-70b-instruct:free",
     envVar: "OPENROUTER_API_KEY",
   },
 };
