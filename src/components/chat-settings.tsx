@@ -541,6 +541,9 @@ export function ModelPicker() {
             </button>
           )}
           <div className="my-1 h-px bg-border" />
+          <div className="px-3 pt-1 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+            Your keys · bring your own
+          </div>
           {CATALOG.map((c) => {
             const conn = connectedByCat.get(c.id);
             const isActive = conn && conn.id === activeId;
