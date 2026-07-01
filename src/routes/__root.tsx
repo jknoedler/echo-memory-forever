@@ -96,8 +96,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:description", content: "DØ MØRE" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2f5d502d-b0aa-4ae3-835a-7ce6142845e1/id-preview-21f0b68e--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782814392094.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2f5d502d-b0aa-4ae3-835a-7ce6142845e1/id-preview-21f0b68e--d81904b6-5fee-4b15-9fcd-8d6421c78aae.lovable.app-1782814392094.png" },
+      // og:image / twitter:image are injected by the publish pipeline.
+      // Do NOT inline them here — see scripts/test-share-images.mjs.
     ],
     links: [
       {
