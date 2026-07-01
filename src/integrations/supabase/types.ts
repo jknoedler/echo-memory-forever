@@ -195,6 +195,59 @@ export type Database = {
           },
         ]
       }
+      pending_followups: {
+        Row: {
+          created_at: string
+          cue: string | null
+          due_at: string
+          id: string
+          keywords: string[]
+          raised_at: string | null
+          resolved_at: string | null
+          resolved_source: string | null
+          status: string
+          thread_id: string | null
+          topic: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          cue?: string | null
+          due_at: string
+          id?: string
+          keywords?: string[]
+          raised_at?: string | null
+          resolved_at?: string | null
+          resolved_source?: string | null
+          status?: string
+          thread_id?: string | null
+          topic: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          cue?: string | null
+          due_at?: string
+          id?: string
+          keywords?: string[]
+          raised_at?: string | null
+          resolved_at?: string | null
+          resolved_source?: string | null
+          status?: string
+          thread_id?: string | null
+          topic?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pending_followups_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       personality_rules: {
         Row: {
           created_at: string
