@@ -893,6 +893,15 @@ export const Route = createFileRoute("/api/chat")({
                 tier: "fallback",
                 fallback_catalog: usedFallbackLabel,
               });
+              extractAndSaveTurn({
+                supabase,
+                userId,
+                threadId: threadId!,
+                userText,
+                assistantText: fbText,
+                model: primaryModel,
+              }).catch(() => {});
+            }
             }
 
             try {
