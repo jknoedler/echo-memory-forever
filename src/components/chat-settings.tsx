@@ -8,6 +8,7 @@ import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
+import { OPENROUTER_FREE_MODELS } from "@/lib/openrouter-free";
 
 const ADV_KEY = "mement0_advanced";
 
