@@ -33,10 +33,17 @@ export const Route = createFileRoute("/_authenticated/c/$threadId")({
 
 type DBMsg = { id: string; role: string; content: string; parts: unknown; created_at: string };
 
+function stripFallbackBanner(text: string): string {
+  return text.replace(
+    /^\s*↻?\s*Primary model declined\s+[—-]\s*capability fallback engaged\.\s*/i,
+    "",
+  );
+}
+
 function dbToUI(m: DBMsg): UIMessage {
   const parts = Array.isArray(m.parts)
     ? (m.parts as UIMessage["parts"])
-    : [{ type: "text" as const, text: m.content }];
+    : [{ type: "text" as const, text: stripFallbackBanner(m.content) }];
   return { id: m.id, role: (m.role as UIMessage["role"]) ?? "user", parts };
 }
 
@@ -184,7 +191,7 @@ function ChatWindow({
     if (!last || last.role !== "assistant") return;
     if (playedRef.current.has(last.id)) return;
     const text = last.parts
-      .map((p) => (p.type === "text" ? p.text : ""))
+      .map((p) => (p.type === "text" ? stripFallbackBanner(p.text) : ""))
       .filter(Boolean)
       .join("")
       .trim();
@@ -614,7 +621,7 @@ function ChatWindow({
 function MessageBubble({ msg }: { msg: UIMessage }) {
   const isUser = msg.role === "user";
   const text = msg.parts
-    .map((p) => (p.type === "text" ? p.text : ""))
+    .map((p) => (p.type === "text" ? stripFallbackBanner(p.text) : ""))
     .filter(Boolean)
     .join("");
   const files = msg.parts.filter(
