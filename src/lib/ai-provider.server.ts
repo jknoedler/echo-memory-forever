@@ -67,11 +67,16 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
     if (!baseURL) {
       throw new Error(`Saved provider "${ap.catalog_id}" has no base URL configured.`);
     }
-    const modelId = (cfg.model || ap.default_model || "").trim();
+    let modelId = (cfg.model || ap.default_model || "").trim();
     if (!modelId) {
       throw new Error(`No model selected for saved provider "${ap.catalog_id}".`);
     }
     const apiKey = ap.api_key?.trim();
+    // SAFETY: if this saved provider points at OpenRouter and has NO user
+    // key of its own, it will bill our project key. Force the free allowlist.
+    if (/(^|\.)openrouter\.ai\b/i.test(baseURL) && !apiKey) {
+      modelId = sanitizeOpenRouterModel(modelId);
+    }
     const provider = createOpenAICompatible({
       name: ap.catalog_id,
       baseURL,
@@ -84,8 +89,13 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
   if (cfg.provider === "custom") {
     const baseURL = cfg.custom_base_url?.trim();
     const apiKey = cfg.custom_api_key?.trim() || "not-required";
-    const modelId = cfg.custom_model_id?.trim() || cfg.model;
+    let modelId = cfg.custom_model_id?.trim() || cfg.model;
     if (!baseURL) throw new Error("Custom provider selected but no base URL is configured.");
+    // Same safety net for a "custom" row that happens to point at OpenRouter
+    // without the user supplying their own key.
+    if (/(^|\.)openrouter\.ai\b/i.test(baseURL) && (!apiKey || apiKey === "not-required")) {
+      modelId = sanitizeOpenRouterModel(modelId);
+    }
     const provider = createOpenAICompatible({
       name: "custom",
       baseURL,
@@ -93,6 +103,7 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
     });
     return { model: provider(modelId), providerName: "custom", modelId };
   }
+
 
   // 3. Everything else → OpenRouter free tier on the project key.
   // Legacy `provider` values (groq/openai/venice/gemini/llama/lovable/auto)
