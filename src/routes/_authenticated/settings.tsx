@@ -13,24 +13,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
-const LOVABLE_MODELS = [
-  "google/gemini-3-flash-preview",
-  "google/gemini-3.5-flash",
-  "google/gemini-3.1-pro-preview",
-  "google/gemini-2.5-pro",
-  "google/gemini-2.5-flash",
-  "openai/gpt-5",
-  "openai/gpt-5-mini",
-  "openai/gpt-5.4",
-];
+import { OPENROUTER_FREE_MODELS, OPENROUTER_FREE_DEFAULT } from "@/lib/openrouter-free";
 
-const OPENAI_DIRECT_MODELS = [
-  "gpt-4o-mini",
-  "gpt-4o",
-  "gpt-4.1",
-  "gpt-4.1-mini",
-  "o4-mini",
-];
 
 function SettingsPage() {
   const qc = useQueryClient();
@@ -49,8 +33,8 @@ function SettingsPage() {
   useEffect(() => {
     if (!q.data) return;
     setForm({
-      provider: q.data.provider ?? "lovable",
-      model: q.data.model ?? "google/gemini-3-flash-preview",
+      provider: q.data.provider ?? "openrouter",
+      model: q.data.model ?? OPENROUTER_FREE_DEFAULT,
       custom_base_url: q.data.custom_base_url ?? "",
       custom_api_key: q.data.custom_api_key ?? "",
       custom_model_id: q.data.custom_model_id ?? "",
@@ -63,7 +47,7 @@ function SettingsPage() {
     mutationFn: () =>
       updateMySettings({
         data: {
-          provider: form.provider as "lovable" | "openai" | "custom",
+          provider: form.provider as "openrouter" | "custom",
           model: form.model,
           custom_base_url: form.custom_base_url || null,
           custom_api_key: form.custom_api_key || null,
@@ -107,61 +91,47 @@ function SettingsPage() {
           <h1 className="mt-1 text-3xl font-display tracking-tight">Settings</h1>
         </header>
 
-        <Card title="AI provider" subtitle="By default MementØ routes through our included gateway — no API key needed from you. Switch to OpenAI Direct to use the project's OPENAI_API_KEY, or Custom to bring your own OpenAI-compatible endpoint (OpenRouter, Anthropic via proxy, Ollama, vLLM, self-hosted llama).">
-          <Field label="Provider" hint="Included = our gateway. OpenAI = direct via OPENAI_API_KEY. Custom = your own endpoint.">
+        <Card title="AI provider" subtitle="MementØ ships with OpenRouter's free-tier models — no key needed from you. Add your own OpenAI-compatible endpoint (paid OpenRouter, Anthropic via proxy, Ollama, vLLM, self-hosted llama) with Custom.">
+          <Field label="Provider" hint="Free = our OpenRouter free chain. Custom = your own OpenAI-compatible endpoint.">
             <select
               value={form.provider}
               onChange={(e) => {
                 const provider = e.target.value;
                 setForm((f) => {
                   let model = f.model;
-                  if (provider === "lovable" && !LOVABLE_MODELS.includes(model)) {
-                    model = "google/gemini-3-flash-preview";
-                  } else if (provider === "openai" && !OPENAI_DIRECT_MODELS.includes(model)) {
-                    model = "gpt-4o-mini";
+                  if (
+                    provider === "openrouter" &&
+                    !OPENROUTER_FREE_MODELS.some((m) => m.id === model)
+                  ) {
+                    model = OPENROUTER_FREE_DEFAULT;
                   }
                   return { ...f, provider, model };
                 });
               }}
               className="auth-input"
             >
-              <option value="lovable">Claude (default) — no key required</option>
-              <option value="openai">OpenAI Direct — uses project OPENAI_API_KEY</option>
+              <option value="openrouter">Free · OpenRouter free-tier models</option>
               <option value="custom">Bring your own — OpenAI-compatible endpoint</option>
             </select>
           </Field>
 
-          {form.provider === "lovable" && (
-            <Field label="Model">
+          {form.provider === "openrouter" && (
+            <Field label="Model" hint="Every option is $0 on our project key. If one errors, chat auto-cycles to the next.">
               <select
                 value={form.model}
                 onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
                 className="auth-input"
               >
-                {LOVABLE_MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
+                {OPENROUTER_FREE_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label} — {m.hint}
                   </option>
                 ))}
               </select>
             </Field>
           )}
 
-          {form.provider === "openai" && (
-            <Field label="Model" hint="Calls api.openai.com directly with the OPENAI_API_KEY stored on the project.">
-              <select
-                value={form.model}
-                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
-                className="auth-input"
-              >
-                {OPENAI_DIRECT_MODELS.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-            </Field>
-          )}
+
 
           {form.provider === "custom" && (
             <div className="space-y-4">

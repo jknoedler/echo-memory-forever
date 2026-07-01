@@ -1,8 +1,8 @@
 // Multi-provider router. Returns an AI-SDK language model.
 //
-// Built-in providers: groq, openai, venice, llama, gemini, openrouter.
-// All are spoken to via OpenAI-compatible chat completions, so the
-// resolver only needs baseURL + apiKey + modelId.
+// Shipped built-in: OpenRouter only (free-tier models on the project key).
+// Users bring their own keys for anything else via the Library — those go
+// through the "saved provider" branch below.
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { sanitizeOpenRouterModel } from "./openrouter-free";
 
@@ -29,113 +29,38 @@ export type ResolvedProvider = {
   modelId: string;
 };
 
-export type BuiltinKind = "openai" | "groq" | "llama" | "venice" | "gemini" | "openrouter";
+// The only kind we ship with. Legacy `provider` column values ("groq",
+// "openai", "venice", "gemini", "llama") are coerced to "openrouter" so
+// old accounts keep working after the pivot.
+export type BuiltinKind = "openrouter";
 
 type ResolveOpts = {
-  openaiApiKey?: string;
-  groqApiKey?: string;
-  llamaApiKey?: string;
-  veniceApiKey?: string;
-  geminiApiKey?: string;
   openrouterApiKey?: string;
   activeProvider?: ActiveProvider | null;
 };
 
-const BUILTIN_CONFIG: Record<
-  BuiltinKind,
-  { baseURL: string; defaultModel: string; envName: string }
-> = {
-  openai: {
-    baseURL: "https://api.openai.com/v1",
-    defaultModel: "gpt-4o-mini",
-    envName: "OPENAI_API_KEY",
-  },
-  groq: {
-    baseURL: "https://api.groq.com/openai/v1",
-    defaultModel: "llama-3.3-70b-versatile",
-    envName: "GROQ_API_KEY",
-  },
-  llama: {
-    baseURL: "https://api.llama.com/compat/v1",
-    defaultModel: "Llama-3.3-70B-Instruct",
-    envName: "LLAMA_API_KEY",
-  },
-  venice: {
-    baseURL: "https://api.venice.ai/api/v1",
-    defaultModel: "venice-uncensored",
-    envName: "VENICE_API_KEY",
-  },
-  gemini: {
-    baseURL: "https://generativelanguage.googleapis.com/v1beta/openai",
-    defaultModel: "gemini-2.5-flash",
-    envName: "GEMINI_API_KEY",
-  },
-  openrouter: {
-    baseURL: "https://openrouter.ai/api/v1",
-    defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
-    envName: "OPENROUTER_API_KEY",
-  },
-};
+const OPENROUTER = {
+  baseURL: "https://openrouter.ai/api/v1",
+  defaultModel: "meta-llama/llama-3.3-70b-instruct:free",
+  envName: "OPENROUTER_API_KEY",
+} as const;
 
-export function builtinDefaultModel(kind: BuiltinKind): string {
-  return BUILTIN_CONFIG[kind].defaultModel;
+export function builtinDefaultModel(_kind: BuiltinKind): string {
+  return OPENROUTER.defaultModel;
 }
 
-function buildBuiltin(
-  kind: BuiltinKind,
-  apiKey: string,
-  modelOverride?: string,
-): ResolvedProvider {
-  const cfg = BUILTIN_CONFIG[kind];
-  let modelId = modelOverride || cfg.defaultModel;
-  // Our project OpenRouter key is capped to free-tier models only —
-  // never let a paid model id reach OpenRouter on our card.
-  if (kind === "openrouter") modelId = sanitizeOpenRouterModel(modelId);
+function buildOpenRouter(apiKey: string, modelOverride?: string): ResolvedProvider {
+  const modelId = sanitizeOpenRouterModel(modelOverride || OPENROUTER.defaultModel);
   const provider = createOpenAICompatible({
-    name: kind,
-    baseURL: cfg.baseURL,
+    name: "openrouter",
+    baseURL: OPENROUTER.baseURL,
     headers: { Authorization: `Bearer ${apiKey}` },
   });
-  return { model: provider(modelId), providerName: kind, modelId };
-}
-
-function pickKey(kind: BuiltinKind, opts: ResolveOpts): string | undefined {
-  switch (kind) {
-    case "openai":
-      return opts.openaiApiKey;
-    case "groq":
-      return opts.groqApiKey;
-    case "llama":
-      return opts.llamaApiKey;
-    case "venice":
-      return opts.veniceApiKey;
-    case "gemini":
-      return opts.geminiApiKey;
-    case "openrouter":
-      return opts.openrouterApiKey;
-  }
-}
-
-function autoPick(cfg: UserAiConfig, opts: ResolveOpts): ResolvedProvider {
-  const m = (cfg.model || "").trim();
-  const looksHostedGateway = m.includes("/"); // "google/gemini-...", "openai/gpt-..."
-  const passModel = !looksHostedGateway ? m || undefined : undefined;
-
-  // Order: stable hosted routes first → direct Meta Llama later.
-  // Direct Llama keys have proven prone to intermittent 401s, so don't let
-  // that key be the first thing Auto relies on when Groq/OpenRouter/Gemini are healthy.
-  const order: BuiltinKind[] = ["groq", "openrouter", "gemini", "llama", "venice", "openai"];
-  for (const kind of order) {
-    const key = pickKey(kind, opts);
-    if (key) return buildBuiltin(kind, key, passModel);
-  }
-  throw new Error(
-    "No AI provider is configured. Add one of LLAMA_API_KEY, GROQ_API_KEY, OPENROUTER_API_KEY, GEMINI_API_KEY, VENICE_API_KEY, or OPENAI_API_KEY.",
-  );
+  return { model: provider(modelId), providerName: "openrouter", modelId };
 }
 
 export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): ResolvedProvider {
-  // 1. Saved provider from the user's library.
+  // 1. Saved provider from the user's library (BYO key).
   if (opts.activeProvider) {
     const ap = opts.activeProvider;
     const baseURL = ap.base_url?.trim();
@@ -155,19 +80,7 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
     return { model: provider(modelId), providerName: ap.catalog_id, modelId };
   }
 
-  // 2. Explicit built-in provider.
-  if (cfg.provider in BUILTIN_CONFIG) {
-    const kind = cfg.provider as BuiltinKind;
-    const key = pickKey(kind, opts);
-    if (!key) {
-      throw new Error(
-        `${kind} provider selected but ${BUILTIN_CONFIG[kind].envName} is not configured.`,
-      );
-    }
-    return buildBuiltin(kind, key, cfg.model || undefined);
-  }
-
-  // 3. Custom (raw base URL + key).
+  // 2. Custom (raw base URL + key from settings, not the catalog).
   if (cfg.provider === "custom") {
     const baseURL = cfg.custom_base_url?.trim();
     const apiKey = cfg.custom_api_key?.trim() || "not-required";
@@ -181,6 +94,14 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
     return { model: provider(modelId), providerName: "custom", modelId };
   }
 
-  // 4. "auto" / unknown → auto-pick.
-  return autoPick(cfg, opts);
+  // 3. Everything else → OpenRouter free tier on the project key.
+  // Legacy `provider` values (groq/openai/venice/gemini/llama/lovable/auto)
+  // all land here.
+  const key = opts.openrouterApiKey;
+  if (!key) {
+    throw new Error(
+      "OpenRouter is not configured. Set OPENROUTER_API_KEY, or add your own key from the Library.",
+    );
+  }
+  return buildOpenRouter(key, cfg.model || undefined);
 }

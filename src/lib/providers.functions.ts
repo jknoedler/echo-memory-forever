@@ -11,7 +11,6 @@ export const listUserProviders = createServerFn({ method: "GET" })
       .select("id, catalog_id, label, base_url, default_model, created_at, api_key")
       .order("created_at", { ascending: false });
     if (error) throw new Error(error.message);
-    // Don't return the raw key — just whether one is set.
     return (data ?? []).map((row) => ({
       id: row.id,
       catalog_id: row.catalog_id,
@@ -71,16 +70,22 @@ export const setActiveProvider = createServerFn({ method: "POST" })
   .inputValidator((d) =>
     z.object({
       provider_id: z.string().uuid().nullable(),
-      provider_kind: z.enum(["lovable", "openai", "groq", "llama", "venice", "gemini", "openrouter", "custom"]).optional(),
+      // Legacy kinds still accepted; anything not custom/openrouter is
+      // coerced to openrouter so old clients keep working.
+      provider_kind: z
+        .enum(["lovable", "openai", "groq", "llama", "venice", "gemini", "openrouter", "custom"])
+        .optional(),
       model: z.string().max(200).optional(),
     }).parse(d),
   )
-
   .handler(async ({ data, context }) => {
-    const providerName =
-      data.provider_id !== null
-        ? "custom"
-        : (data.provider_kind ?? "lovable");
+    let providerName: string;
+    if (data.provider_id !== null) {
+      providerName = "custom";
+    } else {
+      const kind = data.provider_kind ?? "openrouter";
+      providerName = kind === "custom" ? "custom" : "openrouter";
+    }
     const update: {
       active_provider_id: string | null;
       provider: string;
@@ -90,7 +95,6 @@ export const setActiveProvider = createServerFn({ method: "POST" })
       provider: providerName,
     };
     if (data.model) {
-      // Cap our project OpenRouter key to free-tier models only.
       update.model =
         providerName === "openrouter" ? sanitizeOpenRouterModel(data.model) : data.model;
     }
@@ -105,13 +109,14 @@ export const setActiveProvider = createServerFn({ method: "POST" })
 export const listEnvProviders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async () => {
+    // We only ship OpenRouter now. Other flags are kept `false` so any
+    // stale UI that reads them just hides those sections.
     return {
-      openai: !!process.env.OPENAI_API_KEY,
-      groq: !!process.env.GROQ_API_KEY,
-      llama: !!process.env.LLAMA_API_KEY,
-      venice: !!process.env.VENICE_API_KEY,
-      gemini: !!process.env.GEMINI_API_KEY,
+      openai: false,
+      groq: false,
+      llama: false,
+      venice: false,
+      gemini: false,
       openrouter: !!process.env.OPENROUTER_API_KEY,
     };
   });
-
