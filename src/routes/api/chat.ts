@@ -172,21 +172,17 @@ export const Route = createFileRoute("/api/chat")({
           if (ap) activeProvider = ap;
         }
 
-        // Capability-fallback provider — used when primary refuses. Can be
-        // either a saved library row OR an env-key built-in (groq/openai).
+        // Capability-fallback provider. Shipped built-ins are OpenRouter-free
+        // only; the fallback path either uses another OR free model on the
+        // project key or (if the user configured one) a saved BYO provider.
         let fallbackProvider = null as null | {
           catalog_id: string;
           base_url: string | null;
           api_key: string | null;
           default_model: string | null;
         };
-        type FbKind = "groq" | "openai" | "llama" | "venice" | "gemini" | "openrouter";
+        type FbKind = "openrouter";
         const FB_ENV: Record<FbKind, string | undefined> = {
-          groq: process.env.GROQ_API_KEY,
-          openai: process.env.OPENAI_API_KEY,
-          llama: process.env.LLAMA_API_KEY,
-          venice: process.env.VENICE_API_KEY,
-          gemini: process.env.GEMINI_API_KEY,
           openrouter: process.env.OPENROUTER_API_KEY,
         };
         let fallbackEnvKind: FbKind | null = null;
@@ -204,16 +200,10 @@ export const Route = createFileRoute("/api/chat")({
             .maybeSingle();
           if (fb) fallbackProvider = fb;
         } else if (!settings?.fallback_provider_kind && !settings?.fallback_provider_id) {
-          // No explicit fallback configured — default to stable hosted Llama
-          // routes first. Direct Meta Llama can intermittently 401, so keep it
-          // behind Groq/OpenRouter/Gemini instead of making it the first fallback.
-          if (FB_ENV.groq) fallbackEnvKind = "groq";
-          else if (FB_ENV.openrouter) fallbackEnvKind = "openrouter";
-          else if (FB_ENV.gemini) fallbackEnvKind = "gemini";
-          else if (FB_ENV.llama) fallbackEnvKind = "llama";
-          else if (FB_ENV.venice) fallbackEnvKind = "venice";
-          else if (FB_ENV.openai) fallbackEnvKind = "openai";
+          // No explicit fallback configured — default to OpenRouter free.
+          if (FB_ENV.openrouter) fallbackEnvKind = "openrouter";
         }
+
 
 
 
