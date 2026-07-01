@@ -759,8 +759,20 @@ export const Route = createFileRoute("/api/chat")({
               primaryFailed = r.failed;
               if (!primaryFailed && primaryText) {
                 await persistAssistant(primaryText, { tier: "primary" });
+                // Fire-and-forget: label the turn + stage a follow-up
+                // if the exchange described a future outcome worth
+                // checking on. Uses the same primary model.
+                extractAndSaveTurn({
+                  supabase,
+                  userId,
+                  threadId: threadId!,
+                  userText,
+                  assistantText: primaryText,
+                  model: primaryModel,
+                }).catch(() => {});
               }
             }
+
 
             // Calendar citation validator. If the user asked about dated
             // material and the model failed to cite an ISO date from the
