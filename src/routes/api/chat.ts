@@ -333,6 +333,11 @@ export const Route = createFileRoute("/api/chat")({
           .map((p) => `- ${p.title}${p.due_at ? ` (due ${p.due_at})` : ""}`)
           .join("\n");
 
+        // Follow-ups that are due — model is expected to raise these on
+        // its own initiative this turn, in DED voice, once.
+        const followupBlock = await buildFollowupBlock(supabase, userId);
+
+
         // Calendar events — user-curated dated milestones. Pull a window
         // around "now" so the model has both recent history and near-future
         // commitments without dragging in the entire archive.
