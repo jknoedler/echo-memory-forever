@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { sanitizeOpenRouterModel } from "./openrouter-free";
 
 export const getMySettings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
