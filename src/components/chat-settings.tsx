@@ -8,7 +8,7 @@ import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
-import { OPENROUTER_FREE_MODELS } from "@/lib/openrouter-free";
+import { OPENROUTER_FREE_MODELS, OPENROUTER_FREE_DEFAULT } from "@/lib/openrouter-free";
 
 const ADV_KEY = "mement0_advanced";
 
@@ -37,11 +37,10 @@ export function ChatSettings({
   const qc = useQueryClient();
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
-
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const fallbackM = useMutation({
-    mutationFn: (v: { id: string | null; kind: "groq" | "openai" | "llama" | "venice" | "gemini" | "openrouter" | null }) =>
+    mutationFn: (v: { id: string | null; kind: "openrouter" | null }) =>
       updateMySettings({
         data: { fallback_provider_id: v.id, fallback_provider_kind: v.kind },
       }),
@@ -52,7 +51,6 @@ export function ChatSettings({
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
-
   useEffect(() => {
     function onDoc(e: MouseEvent) {
       if (!ref.current?.contains(e.target as Node)) setOpen(false);
@@ -60,7 +58,6 @@ export function ChatSettings({
     if (open) document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [open]);
-
 
   return (
     <div className="relative" ref={ref}>
@@ -78,7 +75,6 @@ export function ChatSettings({
             Background
           </p>
           <div className="grid grid-cols-3 gap-1.5 px-1">
-
             {BG_PALETTES.map((p) => (
               <button
                 key={p.id}
@@ -145,57 +141,30 @@ export function ChatSettings({
                   Capability fallback
                 </p>
                 <p className="mt-1 text-[11px] text-muted-foreground leading-snug">
-                  If the primary model refuses or can't answer, auto-retry the
-                  same turn on this provider.
+                  Auto-cycles through the other OpenRouter free models when the
+                  active one refuses, times out, or gets rate-limited. Pick a
+                  saved BYO provider to try it first.
                 </p>
                 <select
                   className="mt-2 w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
                   value={
-                    settingsQ.data?.fallback_provider_kind === "venice"
-                      ? "env:venice"
-                      : settingsQ.data?.fallback_provider_kind === "groq"
-                        ? "env:groq"
-                      : settingsQ.data?.fallback_provider_kind === "openrouter"
-                        ? "env:openrouter"
-                        : settingsQ.data?.fallback_provider_kind === "gemini"
-                          ? "env:gemini"
-                          : settingsQ.data?.fallback_provider_kind === "openai"
-                            ? "env:openai"
-                            : settingsQ.data?.fallback_provider_kind === "llama"
-                              ? "env:llama"
-                              : settingsQ.data?.fallback_provider_id ?? ""
+                    settingsQ.data?.fallback_provider_kind === "openrouter"
+                      ? "env:openrouter"
+                      : settingsQ.data?.fallback_provider_id ?? ""
                   }
                   onChange={(e) => {
                     const v = e.target.value;
-                    if (v === "env:venice") fallbackM.mutate({ id: null, kind: "venice" });
-                    else if (v === "env:groq") fallbackM.mutate({ id: null, kind: "groq" });
-                    else if (v === "env:openrouter") fallbackM.mutate({ id: null, kind: "openrouter" });
-                    else if (v === "env:gemini") fallbackM.mutate({ id: null, kind: "gemini" });
-                    else if (v === "env:openai") fallbackM.mutate({ id: null, kind: "openai" });
-                    else if (v === "env:llama") fallbackM.mutate({ id: null, kind: "llama" });
+                    if (v === "env:openrouter") fallbackM.mutate({ id: null, kind: "openrouter" });
                     else fallbackM.mutate({ id: v || null, kind: null });
                   }}
                 >
                   <option value="">
-                    {envQ.data?.groq || envQ.data?.openrouter || envQ.data?.gemini ? "Auto (Groq/OpenRouter/Gemini)" : "Off"}
+                    {envQ.data?.openrouter ? "Auto (cycle OpenRouter free)" : "Off"}
                   </option>
-                  {envQ.data?.groq && (
-                    <option value="env:groq">Groq (project key) · Llama 3.3 70B</option>
-                  )}
                   {envQ.data?.openrouter && (
-                    <option value="env:openrouter">OpenRouter (project key) · Llama 3.3 70B</option>
-                  )}
-                  {envQ.data?.gemini && (
-                    <option value="env:gemini">Gemini (project key) · 2.5 Flash</option>
-                  )}
-                  {envQ.data?.llama && (
-                    <option value="env:llama">Direct Llama (project key) · can 401</option>
-                  )}
-                  {envQ.data?.venice && (
-                    <option value="env:venice">Venice (project key) · venice-uncensored</option>
-                  )}
-                  {envQ.data?.openai && (
-                    <option value="env:openai">OpenAI (project key) · gpt-4o-mini</option>
+                    <option value="env:openrouter">
+                      OpenRouter free chain (cycle every free model)
+                    </option>
                   )}
                   {(providersQ.data ?? []).map((p) => {
                     const cat = findCatalog(p.catalog_id);
@@ -207,7 +176,6 @@ export function ChatSettings({
                     );
                   })}
                 </select>
-
               </div>
             </>
           )}
@@ -228,15 +196,17 @@ export function ModelPicker() {
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
 
   const activateM = useMutation({
-    mutationFn: (v: { provider_id: string | null; provider_kind?: "lovable" | "openai" | "groq" | "llama" | "venice" | "gemini" | "openrouter" | "custom"; model?: string }) =>
-      setActiveProvider({ data: v }),
+    mutationFn: (v: {
+      provider_id: string | null;
+      provider_kind?: "openrouter" | "custom";
+      model?: string;
+    }) => setActiveProvider({ data: v }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["settings"] });
       toast.success("Model switched");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
-
 
   useEffect(() => {
     function onDoc(e: MouseEvent) {
@@ -247,96 +217,31 @@ export function ModelPicker() {
   }, [open]);
 
   const activeId = settingsQ.data?.active_provider_id ?? null;
-  const providerKind = settingsQ.data?.provider ?? "lovable";
-  const envOpenAiActive = !activeId && providerKind === "openai";
-  const envGroqActive = !activeId && providerKind === "groq";
-  const envLlamaActive = !activeId && providerKind === "llama";
-  const envVeniceActive = !activeId && providerKind === "venice";
-  const envGeminiActive = !activeId && providerKind === "gemini";
+  const providerKind = settingsQ.data?.provider ?? "openrouter";
   const envOpenRouterActive = !activeId && providerKind === "openrouter";
   const activeProvider = (providersQ.data ?? []).find((p) => p.id === activeId);
   const activeCat = activeProvider ? findCatalog(activeProvider.catalog_id) : null;
+  const activeFreeModel = envOpenRouterActive
+    ? OPENROUTER_FREE_MODELS.find((m) => m.id === (settingsQ.data?.model ?? OPENROUTER_FREE_DEFAULT))
+    : null;
   const label = activeId
     ? `${activeCat?.name ?? "Custom"} · ${settingsQ.data?.model || activeProvider?.default_model || "—"}`
-    : envOpenAiActive
-      ? `OpenAI · ${settingsQ.data?.model || "gpt-4o-mini"}`
-      : envGroqActive
-        ? `Groq · ${settingsQ.data?.model || "llama-3.3-70b-versatile"}`
-        : envLlamaActive
-          ? `Llama · ${settingsQ.data?.model || "Llama-3.3-70B-Instruct"}`
-          : envVeniceActive
-            ? `Venice · ${settingsQ.data?.model || "venice-uncensored"}`
-            : envGeminiActive
-              ? `Gemini · ${settingsQ.data?.model || "gemini-2.5-flash"}`
-              : envOpenRouterActive
-                ? `OpenRouter · ${settingsQ.data?.model || "meta-llama/llama-3.3-70b-instruct:free"}`
-                : "Auto (recommended)";
-
+    : activeFreeModel
+      ? `Free · ${activeFreeModel.label}`
+      : "Free · Llama 3.3 70B";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
   );
 
-  function pickAuto() {
-    activateM.mutate({ provider_id: null, provider_kind: "lovable" });
-    setOpen(false);
-  }
-
-  function pickEnvOpenAi() {
-    const cat = findCatalog("openai");
-    activateM.mutate({
-      provider_id: null,
-      provider_kind: "openai",
-      model: cat?.models[0] ?? "gpt-4o-mini",
-    });
-    setOpen(false);
-  }
-
-  function pickEnvGroq() {
-    activateM.mutate({
-      provider_id: null,
-      provider_kind: "groq",
-      model: "llama-3.3-70b-versatile",
-    });
-    setOpen(false);
-  }
-
-  function pickEnvOpenRouter() {
+  function pickFreeModel(id: string) {
     activateM.mutate({
       provider_id: null,
       provider_kind: "openrouter",
-      model: "meta-llama/llama-3.3-70b-instruct:free",
+      model: id,
     });
     setOpen(false);
   }
-
-  function pickEnvGemini() {
-    activateM.mutate({
-      provider_id: null,
-      provider_kind: "gemini",
-      model: "gemini-2.5-flash",
-    });
-    setOpen(false);
-  }
-
-  function pickEnvLlama() {
-    activateM.mutate({
-      provider_id: null,
-      provider_kind: "llama",
-      model: "Llama-3.3-70B-Instruct",
-    });
-    setOpen(false);
-  }
-
-  function pickEnvVenice() {
-    activateM.mutate({
-      provider_id: null,
-      provider_kind: "venice",
-      model: "venice-uncensored",
-    });
-    setOpen(false);
-  }
-
 
   function pickCatalog(catId: string) {
     const connected = connectedByCat.get(catId);
@@ -347,7 +252,7 @@ export function ModelPicker() {
       return;
     }
     const cat = findCatalog(catId);
-    const ok = confirm(`Model missing — download ${cat?.name ?? catId} now?`);
+    const ok = confirm(`Add your own ${cat?.name ?? catId} key now?`);
     if (ok) {
       setOpen(false);
       navigate({ to: "/library", search: { focus: catId } });
@@ -366,67 +271,23 @@ export function ModelPicker() {
       </button>
       {open && (
         <div className="absolute bottom-10 left-0 z-50 w-72 max-h-80 overflow-y-auto rounded-lg border border-border bg-popover p-1 shadow-xl">
-          <button
-            type="button"
-            onClick={pickAuto}
-            className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-              !activeId ? "text-foreground" : "text-muted-foreground"
-            }`}
-          >
-            <span>
-              <span className="block font-medium">Auto</span>
-              <span className="block text-[10px] text-muted-foreground">
-                DED picks the best model for the moment.
-              </span>
-            </span>
-            {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && !envGeminiActive && !envOpenRouterActive && <Check className="h-3.5 w-3.5 text-primary" />}
-          </button>
-          <div className="mt-1 px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
-            Free · included with MementØ
-          </div>
-          {envQ.data?.groq && !connectedByCat.get("groq") && (
-            <button
-              type="button"
-              onClick={pickEnvGroq}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envGroqActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">Groq (project key)</span>
-                <span className="block text-[10px] truncate">
-                  llama-3.3-70b-versatile · hosted Llama
-                </span>
-              </span>
-              {envGroqActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
-          {envQ.data?.openrouter && !connectedByCat.get("openrouter") && (
+          {envQ.data?.openrouter && (
             <>
-              <div className="mt-1 px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
-                OpenRouter (project key · free only)
+              <div className="px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                Free · included with MementØ
+              </div>
+              <div className="px-3 pb-1 text-[10px] text-muted-foreground/60 leading-snug">
+                All routed through OpenRouter. If one fails mid-turn, the next
+                one in this list picks up automatically.
               </div>
               {OPENROUTER_FREE_MODELS.map((m) => {
                 const isThisActive =
-                  envOpenRouterActive && (settingsQ.data?.model ?? "") === m.id;
+                  envOpenRouterActive && (settingsQ.data?.model ?? OPENROUTER_FREE_DEFAULT) === m.id;
                 return (
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => {
-                      activateM.mutate({
-                        provider_id: null,
-                        provider_kind: "openrouter",
-                        model: m.id,
-                      });
-                      setOpen(false);
-                    }}
+                    onClick={() => pickFreeModel(m.id)}
                     className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
                       isThisActive ? "text-foreground" : "text-muted-foreground"
                     }`}
@@ -447,102 +308,14 @@ export function ModelPicker() {
               })}
             </>
           )}
-          {envQ.data?.gemini && (
-            <button
-              type="button"
-              onClick={pickEnvGemini}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envGeminiActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">Gemini (project key)</span>
-                <span className="block text-[10px] truncate">
-                  gemini-2.5-flash · stable fallback
-                </span>
-              </span>
-              {envGeminiActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
-          {envQ.data?.venice && (
-            <button
-              type="button"
-              onClick={pickEnvVenice}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envVeniceActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">Venice (project key)</span>
-                <span className="block text-[10px] truncate">
-                  venice-uncensored · default fallback
-                </span>
-              </span>
-              {envVeniceActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
 
-          {envQ.data?.llama && !connectedByCat.get("llama") && (
-            <button
-              type="button"
-              onClick={pickEnvLlama}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envLlamaActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">Llama (project key)</span>
-                <span className="block text-[10px] truncate">
-                  Llama-3.3-70B-Instruct · uses LLAMA_API_KEY
-                </span>
-              </span>
-              {envLlamaActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
-          {envQ.data?.openai && !connectedByCat.get("openai") && (
-            <button
-              type="button"
-              onClick={pickEnvOpenAi}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envOpenAiActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">OpenAI (project key)</span>
-                <span className="block text-[10px] truncate">
-                  gpt-4o-mini · uses OPENAI_API_KEY
-                </span>
-              </span>
-              {envOpenAiActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
-          )}
           <div className="my-1 h-px bg-border" />
           <div className="px-3 pt-1 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
             Your keys · bring your own
+          </div>
+          <div className="px-3 pb-1 text-[10px] text-muted-foreground/60 leading-snug">
+            Paid providers (OpenAI, Anthropic, Groq, Venice, etc.) are BYO
+            only — add your key in the Library.
           </div>
           {CATALOG.map((c) => {
             const conn = connectedByCat.get(c.id);
