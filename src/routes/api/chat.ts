@@ -101,6 +101,26 @@ function extractUserText(msg: UIMessage): string {
   return ((msg as unknown as { content?: string }).content ?? "").toString().trim();
 }
 
+function stripFallbackBanner(text: string): string {
+  return text.replace(
+    /^\s*↻?\s*Primary model declined\s+[—-]\s*capability fallback engaged\.\s*/i,
+    "",
+  );
+}
+
+function sanitizeMessageForModel(msg: UIMessage): UIMessage {
+  const parts = (msg as { parts?: UIMessage["parts"] }).parts;
+  if (!Array.isArray(parts)) return msg;
+  return {
+    ...msg,
+    parts: parts.map((part) =>
+      part.type === "text"
+        ? { ...part, text: stripFallbackBanner(part.text) }
+        : part,
+    ),
+  };
+}
+
 export const Route = createFileRoute("/api/chat")({
   server: {
     handlers: {
@@ -280,7 +300,7 @@ export const Route = createFileRoute("/api/chat")({
                   (h: { content: string; source: string; created_at: string; similarity: number }) => {
                     const age = Date.now() - new Date(h.created_at).getTime();
                     const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
-                    return `- (${tier}/${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${h.content}`;
+                    return `- (${tier}/${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${stripFallbackBanner(h.content)}`;
                   },
                 )
                 .join("\n");
@@ -301,7 +321,7 @@ export const Route = createFileRoute("/api/chat")({
           .map((m) => {
             const role = (m.metadata as { role?: string } | null)?.role;
             const tag = role ? `${m.source}:${role}` : m.source;
-            return `- (${tag}, ${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}) ${m.content}`;
+            return `- (${tag}, ${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}) ${stripFallbackBanner(m.content)}`;
           })
           .join("\n");
 
@@ -643,7 +663,7 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        const convertedMessages = await convertToModelMessages(messages);
+        const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel));
 
         // Persist an assistant turn (message row + memory embedding +
         // thread bookkeeping). Used for both primary and fallback messages.
