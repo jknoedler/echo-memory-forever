@@ -232,11 +232,23 @@ export const Route = createFileRoute("/api/chat")({
             .eq("user_id", userId);
         }
 
-        // Retrieve memories — semantic (top-K relevant) + chronological
-        // (most recent regardless of query). Both matter: semantic surfaces
-        // "that Reno thing from months ago", chronological guarantees
-        // continuity so the model never falsely claims "I have no memory".
-        let semanticBlock = "";
+        // TWO-TIER MEMORY
+        //   HOT (RAM):      last 6 months, chronological, always injected.
+        //                   Working recall — recent life, keeps continuity
+        //                   across sessions without needing a semantic hit.
+        //   COLD (ARCHIVE): everything ever recorded, retrieved by semantic
+        //                   similarity only. Eternal. Surfaces "that thing
+        //                   from 3 years ago" when the current turn relates.
+        //
+        // Both blocks are READ-ONLY context. The model recalls from them; it
+        // does NOT fine-tune, "learn", or adjust its weights from anything
+        // here. That separation is what keeps recall accurate instead of
+        // drifting into hallucinated confabulation.
+        const HOT_WINDOW_MS = 6 * 30 * 24 * 3600 * 1000; // ~6 months
+        const hotCutoffIso = new Date(Date.now() - HOT_WINDOW_MS).toISOString();
+
+        // COLD — semantic across the entire archive (no time filter).
+        let archiveBlock = "";
         if (userText) {
           const vec = await embedText(userText);
           if (vec) {
@@ -245,25 +257,29 @@ export const Route = createFileRoute("/api/chat")({
               match_count: 15,
             });
             if (hits && hits.length) {
-              semanticBlock = hits
+              archiveBlock = hits
                 .map(
-                  (h: { content: string; source: string; created_at: string; similarity: number }) =>
-                    `- (${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${h.content}`,
+                  (h: { content: string; source: string; created_at: string; similarity: number }) => {
+                    const age = Date.now() - new Date(h.created_at).getTime();
+                    const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
+                    return `- (${tier}/${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${h.content}`;
+                  },
                 )
                 .join("\n");
             }
           }
         }
 
-        // Chronological recall — last 30 memories across every thread this
-        // user has. Runs even if OPENAI_API_KEY is missing, so continuity
-        // survives an embedding outage.
+        // HOT — last 6 months, chronological, up to 60 entries. Runs even
+        // when OPENAI_API_KEY is missing, so continuity survives an
+        // embedding outage.
         const { data: recentMems } = await supabase
           .from("memories")
           .select("content, source, metadata, created_at")
+          .gte("created_at", hotCutoffIso)
           .order("created_at", { ascending: false })
-          .limit(30);
-        const chronologicalBlock = (recentMems ?? [])
+          .limit(60);
+        const hotBlock = (recentMems ?? [])
           .map((m) => {
             const role = (m.metadata as { role?: string } | null)?.role;
             const tag = role ? `${m.source}:${role}` : m.source;
@@ -272,8 +288,10 @@ export const Route = createFileRoute("/api/chat")({
           .join("\n");
 
         const memoryBlock = [
-          semanticBlock && `# Semantically relevant to this turn:\n${semanticBlock}`,
-          chronologicalBlock && `# Most recent memories across all threads:\n${chronologicalBlock}`,
+          hotBlock &&
+            `# HOT MEMORY — last 6 months, chronological (working recall):\n${hotBlock}`,
+          archiveBlock &&
+            `# COLD ARCHIVE — semantic hits from the eternal archive (surface when relevant, cite the date):\n${archiveBlock}`,
         ]
           .filter(Boolean)
           .join("\n\n");
@@ -405,7 +423,7 @@ export const Route = createFileRoute("/api/chat")({
           "### TIME CONTEXT",
           timeBlock,
           "",
-          "### RETRIEVED MEMORY CONTEXT (your persistent archive across every thread — this is your long-term memory, treat it as first-person recall, never say 'I have no memory')",
+          "### RETRIEVED MEMORY CONTEXT — two-tier, READ-ONLY (this is your persistent memory; treat it as first-person recall, never say 'I have no memory'; do NOT infer new rules about the user from it beyond what's stated, do NOT let it drift your style — recall only)",
           memoryBlock || "(archive is empty — this is genuinely your first exchange with this user)",
           "",
           "### RECENT BIOMETRICS",
