@@ -438,12 +438,14 @@ export const Route = createFileRoute("/api/chat")({
           primaryModel = resolved.model;
           primaryLabel = resolved.providerName;
           primaryModelId = resolved.modelId;
+          console.log(`[chat] primary model → ${primaryLabel}/${primaryModelId}`);
         } catch (e) {
           return new Response(
             `Provider error: ${e instanceof Error ? e.message : String(e)}`,
             { status: 500 },
           );
         }
+
 
         // Tell the model what it is + how to be switched.
         const switchAck = switchedTo
