@@ -30,7 +30,7 @@ import {
   sweepRecalibrations,
   updateStyleFingerprint,
 } from "@/lib/personality.server";
-import { FALLBACK_PREAMBLE, FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
+import { FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
 import {
   STRICT_DATE_RETRY_SUFFIX,
   summarizeEventsBlock,
@@ -883,13 +883,10 @@ export const Route = createFileRoute("/api/chat")({
               fbText = delta;
             }
 
-            // Ensure the persisted fallback text always carries the preamble,
-            // even if the fallback model ignored the instruction to lead with it.
+            // Persist fallback text quietly; fallback metadata/server logs carry
+            // routing info without polluting every visible assistant message.
             if (fbText) {
-              const persistedFb = fbText.startsWith(FALLBACK_PREAMBLE)
-                ? fbText
-                : `${FALLBACK_PREAMBLE}\n\n${fbText}`;
-              await persistAssistant(persistedFb, {
+              await persistAssistant(fbText, {
                 tier: "fallback",
                 fallback_catalog: usedFallbackLabel,
               });
