@@ -44,9 +44,18 @@ export const updateMySettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => SettingsUpdate.parse(d))
   .handler(async ({ data, context }) => {
+    // Guard our project OpenRouter key: only free-tier models allowed.
+    const patch = { ...data };
+    if (patch.provider === "openrouter" && patch.model !== undefined) {
+      patch.model = sanitizeOpenRouterModel(patch.model);
+    }
+    if (patch.fallback_provider_kind === "openrouter") {
+      // Nothing to sanitize here (no model column on fallback), but the
+      // chat route sanitizes at request time too.
+    }
     const { error } = await context.supabase
       .from("user_settings")
-      .update(data)
+      .update(patch)
       .eq("user_id", context.userId);
     if (error) throw new Error(error.message);
     return { ok: true };
