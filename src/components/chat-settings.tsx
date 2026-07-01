@@ -405,27 +405,44 @@ export function ModelPicker() {
             </button>
           )}
           {envQ.data?.openrouter && !connectedByCat.get("openrouter") && (
-            <button
-              type="button"
-              onClick={pickEnvOpenRouter}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envOpenRouterActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">OpenRouter (project key)</span>
-                <span className="block text-[10px] truncate">
-                  meta-llama/llama-3.3-70b-instruct:free
-                </span>
-              </span>
-              {envOpenRouterActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
+            <>
+              <div className="mt-1 px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                OpenRouter (project key · free only)
+              </div>
+              {OPENROUTER_FREE_MODELS.map((m) => {
+                const isThisActive =
+                  envOpenRouterActive && (settingsQ.data?.model ?? "") === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      activateM.mutate({
+                        provider_id: null,
+                        provider_kind: "openrouter",
+                        model: m.id,
+                      });
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                      isThisActive ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-medium truncate">{m.label}</span>
+                      <span className="block text-[10px] truncate">{m.hint}</span>
+                    </span>
+                    {isThisActive ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    ) : (
+                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                        Free
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
           )}
           {envQ.data?.gemini && (
             <button
