@@ -8,6 +8,7 @@ import { BG_PALETTES, ACCENT_PALETTES } from "@/lib/palette";
 import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
+import { OPENROUTER_FREE_MODELS } from "@/lib/openrouter-free";
 
 const ADV_KEY = "mement0_advanced";
 
@@ -380,6 +381,9 @@ export function ModelPicker() {
             </span>
             {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && !envGeminiActive && !envOpenRouterActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          <div className="mt-1 px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+            Free · included with MementØ
+          </div>
           {envQ.data?.groq && !connectedByCat.get("groq") && (
             <button
               type="button"
@@ -404,27 +408,44 @@ export function ModelPicker() {
             </button>
           )}
           {envQ.data?.openrouter && !connectedByCat.get("openrouter") && (
-            <button
-              type="button"
-              onClick={pickEnvOpenRouter}
-              className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
-                envOpenRouterActive ? "text-foreground" : "text-muted-foreground"
-              }`}
-            >
-              <span className="min-w-0">
-                <span className="block font-medium truncate">OpenRouter (project key)</span>
-                <span className="block text-[10px] truncate">
-                  meta-llama/llama-3.3-70b-instruct:free
-                </span>
-              </span>
-              {envOpenRouterActive ? (
-                <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
-              ) : (
-                <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
-                  Ready
-                </span>
-              )}
-            </button>
+            <>
+              <div className="mt-1 px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+                OpenRouter (project key · free only)
+              </div>
+              {OPENROUTER_FREE_MODELS.map((m) => {
+                const isThisActive =
+                  envOpenRouterActive && (settingsQ.data?.model ?? "") === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      activateM.mutate({
+                        provider_id: null,
+                        provider_kind: "openrouter",
+                        model: m.id,
+                      });
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                      isThisActive ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-medium truncate">{m.label}</span>
+                      <span className="block text-[10px] truncate">{m.hint}</span>
+                    </span>
+                    {isThisActive ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    ) : (
+                      <span className="text-[9px] uppercase tracking-widest text-muted-foreground">
+                        Free
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
           )}
           {envQ.data?.gemini && (
             <button
@@ -520,6 +541,9 @@ export function ModelPicker() {
             </button>
           )}
           <div className="my-1 h-px bg-border" />
+          <div className="px-3 pt-1 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+            Your keys · bring your own
+          </div>
           {CATALOG.map((c) => {
             const conn = connectedByCat.get(c.id);
             const isActive = conn && conn.id === activeId;

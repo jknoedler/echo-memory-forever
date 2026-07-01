@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { sanitizeOpenRouterModel } from "./openrouter-free";
 
 export const listUserProviders = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -88,7 +89,11 @@ export const setActiveProvider = createServerFn({ method: "POST" })
       active_provider_id: data.provider_id,
       provider: providerName,
     };
-    if (data.model) update.model = data.model;
+    if (data.model) {
+      // Cap our project OpenRouter key to free-tier models only.
+      update.model =
+        providerName === "openrouter" ? sanitizeOpenRouterModel(data.model) : data.model;
+    }
     const { error } = await context.supabase
       .from("user_settings")
       .update(update)

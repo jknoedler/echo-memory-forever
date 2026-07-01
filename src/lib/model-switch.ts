@@ -45,9 +45,13 @@ const ALIASES: Alias[] = [
   { phrase: /\bgpt[\s-]?4o[\s-]?mini\b/i, provider: "openai", model: "gpt-4o-mini", label: "GPT-4o mini" },
   { phrase: /\bgpt[\s-]?4o\b/i, provider: "openai", model: "gpt-4o", label: "GPT-4o" },
   { phrase: /\b(open\s?ai|gpt)\b/i, provider: "openai", model: "gpt-4o-mini", label: "GPT-4o mini" },
-  { phrase: /\bopen[\s-]?router\b/i, provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B (OpenRouter)" },
-  { phrase: /\bdeepseek\b/i, provider: "openrouter", model: "deepseek/deepseek-chat", label: "DeepSeek (OpenRouter)" },
-  { phrase: /\b(grok|x\.?ai)\b/i, provider: "openrouter", model: "x-ai/grok-2-1212", label: "Grok (OpenRouter)" },
+  { phrase: /\bopen[\s-]?router\b/i, provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B (OpenRouter free)" },
+  { phrase: /\bdeep[\s-]?seek[\s-]?r1\b/i, provider: "openrouter", model: "deepseek/deepseek-r1:free", label: "DeepSeek R1 (free)" },
+  { phrase: /\bdeep[\s-]?seek\b/i, provider: "openrouter", model: "deepseek/deepseek-chat-v3-0324:free", label: "DeepSeek V3 (free)" },
+  { phrase: /\bqwen\b/i, provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct:free", label: "Qwen 2.5 72B (free)" },
+  { phrase: /\bmistral\b/i, provider: "openrouter", model: "mistralai/mistral-small-3.1-24b-instruct:free", label: "Mistral Small 3.1 (free)" },
+  { phrase: /\bnemotron\b/i, provider: "openrouter", model: "nvidia/llama-3.1-nemotron-70b-instruct:free", label: "Nemotron 70B (free)" },
+  { phrase: /\b(grok|x\.?ai)\b/i, provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B (free) — Grok is paid, blocked" },
 
   // Venice (uncensored)
   { phrase: /\bvenice\b/i, provider: "venice", model: "venice-uncensored", label: "Venice Uncensored" },

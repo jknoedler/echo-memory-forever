@@ -4,6 +4,7 @@
 // All are spoken to via OpenAI-compatible chat completions, so the
 // resolver only needs baseURL + apiKey + modelId.
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { sanitizeOpenRouterModel } from "./openrouter-free";
 
 export type UserAiConfig = {
   provider: string;
@@ -86,7 +87,10 @@ function buildBuiltin(
   modelOverride?: string,
 ): ResolvedProvider {
   const cfg = BUILTIN_CONFIG[kind];
-  const modelId = modelOverride || cfg.defaultModel;
+  let modelId = modelOverride || cfg.defaultModel;
+  // Our project OpenRouter key is capped to free-tier models only —
+  // never let a paid model id reach OpenRouter on our card.
+  if (kind === "openrouter") modelId = sanitizeOpenRouterModel(modelId);
   const provider = createOpenAICompatible({
     name: kind,
     baseURL: cfg.baseURL,
