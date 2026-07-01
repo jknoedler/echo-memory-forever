@@ -36,6 +36,11 @@ import {
   summarizeEventsBlock,
   validateCalendarCitation,
 } from "@/lib/calendar-validator";
+import {
+  autoResolveFollowups,
+  buildFollowupBlock,
+  extractAndSaveTurn,
+} from "@/lib/followups.server";
 import type { Database } from "@/integrations/supabase/types";
 
 // Detect upstream 402 (credits exhausted) / 429 (rate-limited) failures so
