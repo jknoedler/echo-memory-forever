@@ -15,7 +15,6 @@ export const getMySettings = createServerFn({ method: "GET" })
       .maybeSingle();
     if (error) throw new Error(error.message);
     if (!data) {
-      // Fallback in case the signup trigger didn't fire
       const { data: ins, error: insErr } = await context.supabase
         .from("user_settings")
         .insert({ user_id: context.userId })
@@ -27,8 +26,12 @@ export const getMySettings = createServerFn({ method: "GET" })
     return data;
   });
 
+// Legacy kinds are still accepted so we don't reject requests from old
+// clients or older DB rows; the resolver coerces them to openrouter.
 const SettingsUpdate = z.object({
-  provider: z.enum(["lovable", "openai", "groq", "llama", "venice", "gemini", "openrouter", "custom"]).optional(),
+  provider: z
+    .enum(["lovable", "openai", "groq", "llama", "venice", "gemini", "openrouter", "custom"])
+    .optional(),
   model: z.string().max(200).optional(),
   custom_base_url: z.string().url().nullable().optional(),
   custom_api_key: z.string().max(500).nullable().optional(),
@@ -36,22 +39,24 @@ const SettingsUpdate = z.object({
   system_prompt_override: z.string().max(8000).nullable().optional(),
   hotl_auto_execute: z.boolean().optional(),
   fallback_provider_id: z.string().uuid().nullable().optional(),
-  fallback_provider_kind: z.enum(["groq", "openai", "llama", "venice", "gemini", "openrouter"]).nullable().optional(),
+  fallback_provider_kind: z.enum(["openrouter"]).nullable().optional(),
 });
-
 
 export const updateMySettings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => SettingsUpdate.parse(d))
   .handler(async ({ data, context }) => {
-    // Guard our project OpenRouter key: only free-tier models allowed.
     const patch = { ...data };
-    if (patch.provider === "openrouter" && patch.model !== undefined) {
+    // Any non-BYO built-in gets forced to openrouter — we ship only OR now.
+    if (
+      patch.provider &&
+      patch.provider !== "custom" &&
+      patch.provider !== "openrouter"
+    ) {
+      patch.provider = "openrouter";
+      if (patch.model !== undefined) patch.model = sanitizeOpenRouterModel(patch.model);
+    } else if (patch.provider === "openrouter" && patch.model !== undefined) {
       patch.model = sanitizeOpenRouterModel(patch.model);
-    }
-    if (patch.fallback_provider_kind === "openrouter") {
-      // Nothing to sanitize here (no model column on fallback), but the
-      // chat route sanitizes at request time too.
     }
     const { error } = await context.supabase
       .from("user_settings")
