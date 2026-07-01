@@ -45,7 +45,7 @@ const ALIASES: Alias[] = [
   { phrase: /\bgpt[\s-]?4o[\s-]?mini\b/i, provider: "openai", model: "gpt-4o-mini", label: "GPT-4o mini" },
   { phrase: /\bgpt[\s-]?4o\b/i, provider: "openai", model: "gpt-4o", label: "GPT-4o" },
   { phrase: /\b(open\s?ai|gpt)\b/i, provider: "openai", model: "gpt-4o-mini", label: "GPT-4o mini" },
-  { phrase: /\bopen[\s-]?router\b/i, provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B (OpenRouter)" },
+  { phrase: /\bopen[\s-]?router\b/i, provider: "openrouter", model: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B (OpenRouter)" },
   { phrase: /\bdeepseek\b/i, provider: "openrouter", model: "deepseek/deepseek-chat", label: "DeepSeek (OpenRouter)" },
   { phrase: /\b(grok|x\.?ai)\b/i, provider: "openrouter", model: "x-ai/grok-2-1212", label: "Grok (OpenRouter)" },
 

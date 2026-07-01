@@ -268,7 +268,7 @@ export function ModelPicker() {
             : envGeminiActive
               ? `Gemini · ${settingsQ.data?.model || "gemini-2.5-flash"}`
               : envOpenRouterActive
-                ? `OpenRouter · ${settingsQ.data?.model || "meta-llama/llama-3.3-70b-instruct"}`
+                ? `OpenRouter · ${settingsQ.data?.model || "meta-llama/llama-3.3-70b-instruct:free"}`
                 : "Auto (recommended)";
 
 
@@ -304,7 +304,7 @@ export function ModelPicker() {
     activateM.mutate({
       provider_id: null,
       provider_kind: "openrouter",
-      model: "meta-llama/llama-3.3-70b-instruct",
+      model: "meta-llama/llama-3.3-70b-instruct:free",
     });
     setOpen(false);
   }
@@ -414,7 +414,7 @@ export function ModelPicker() {
               <span className="min-w-0">
                 <span className="block font-medium truncate">OpenRouter (project key)</span>
                 <span className="block text-[10px] truncate">
-                  meta-llama/llama-3.3-70b-instruct
+                  meta-llama/llama-3.3-70b-instruct:free
                 </span>
               </span>
               {envOpenRouterActive ? (
