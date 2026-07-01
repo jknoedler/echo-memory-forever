@@ -13,24 +13,8 @@ export const Route = createFileRoute("/_authenticated/settings")({
   component: SettingsPage,
 });
 
-const LOVABLE_MODELS = [
-  "google/gemini-3-flash-preview",
-  "google/gemini-3.5-flash",
-  "google/gemini-3.1-pro-preview",
-  "google/gemini-2.5-pro",
-  "google/gemini-2.5-flash",
-  "openai/gpt-5",
-  "openai/gpt-5-mini",
-  "openai/gpt-5.4",
-];
+import { OPENROUTER_FREE_MODELS, OPENROUTER_FREE_DEFAULT } from "@/lib/openrouter-free";
 
-const OPENAI_DIRECT_MODELS = [
-  "gpt-4o-mini",
-  "gpt-4o",
-  "gpt-4.1",
-  "gpt-4.1-mini",
-  "o4-mini",
-];
 
 function SettingsPage() {
   const qc = useQueryClient();
