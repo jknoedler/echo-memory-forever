@@ -2,6 +2,11 @@
 // The chat/settings/provider layers force any openrouter selection served by
 // OUR key into one of these. User-provided OpenRouter keys (user_providers)
 // are NOT restricted — those bill the user, not us.
+//
+// NOTE: OpenRouter rotates their free tier constantly. Every id here must
+// currently show `:free` in their catalog (https://openrouter.ai/api/v1/models).
+// When they pull one, add a replacement and remove the dead id — otherwise
+// requests come back 404 "unavailable for free" / "no endpoints".
 
 export type OpenRouterFreeModel = {
   id: string; // model id sent to OpenRouter
@@ -9,9 +14,8 @@ export type OpenRouterFreeModel = {
   hint: string; // small subtitle
 };
 
-// Every id ends in ":free" — OpenRouter's convention for zero-cost variants.
-// If OR removes one of these, the resolver silently falls back to the
-// default; nothing breaks.
+// Verified free on OpenRouter as of the last sweep. If OR removes one, the
+// chat route silently cycles to the next entry.
 export const OPENROUTER_FREE_MODELS: OpenRouterFreeModel[] = [
   {
     id: "meta-llama/llama-3.3-70b-instruct:free",
@@ -24,39 +28,49 @@ export const OPENROUTER_FREE_MODELS: OpenRouterFreeModel[] = [
     hint: "fastest · low quality",
   },
   {
-    id: "meta-llama/llama-3.2-11b-vision-instruct:free",
-    label: "Llama 3.2 11B Vision",
-    hint: "images + text",
+    id: "qwen/qwen3-next-80b-a3b-instruct:free",
+    label: "Qwen3 Next 80B",
+    hint: "multilingual · MoE",
   },
   {
-    id: "google/gemini-2.0-flash-exp:free",
-    label: "Gemini 2.0 Flash (exp)",
-    hint: "google · experimental",
+    id: "qwen/qwen3-coder:free",
+    label: "Qwen3 Coder",
+    hint: "code-tuned",
   },
   {
-    id: "deepseek/deepseek-r1:free",
-    label: "DeepSeek R1",
-    hint: "reasoning",
+    id: "openai/gpt-oss-120b:free",
+    label: "GPT-OSS 120B",
+    hint: "openai open-weights · big",
   },
   {
-    id: "deepseek/deepseek-chat-v3-0324:free",
-    label: "DeepSeek V3",
-    hint: "general chat",
+    id: "openai/gpt-oss-20b:free",
+    label: "GPT-OSS 20B",
+    hint: "openai open-weights · fast",
   },
   {
-    id: "qwen/qwen-2.5-72b-instruct:free",
-    label: "Qwen 2.5 72B",
-    hint: "multilingual",
+    id: "nvidia/nemotron-3-super-120b-a12b:free",
+    label: "Nemotron 3 Super 120B",
+    hint: "nvidia tuned · reasoning",
   },
   {
-    id: "mistralai/mistral-small-3.1-24b-instruct:free",
-    label: "Mistral Small 3.1 24B",
-    hint: "european · fast",
+    id: "nvidia/nemotron-nano-9b-v2:free",
+    label: "Nemotron Nano 9B",
+    hint: "nvidia · fast",
   },
   {
-    id: "nvidia/llama-3.1-nemotron-70b-instruct:free",
-    label: "Nemotron 70B",
-    hint: "nvidia tuned",
+    id: "nousresearch/hermes-3-llama-3.1-405b:free",
+    label: "Hermes 3 405B",
+    hint: "uncensored · steerable",
+  },
+  {
+    id: "cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+    label: "Dolphin Mistral 24B (Venice)",
+    hint: "uncensored · roleplay",
+  },
+  {
+    id: "google/gemma-4-31b-it:free",
+    label: "Gemma 4 31B",
+    hint: "google open-weights",
   },
 ];
 
