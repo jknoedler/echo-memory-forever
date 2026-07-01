@@ -36,6 +36,11 @@ import {
   summarizeEventsBlock,
   validateCalendarCitation,
 } from "@/lib/calendar-validator";
+import {
+  autoResolveFollowups,
+  buildFollowupBlock,
+  extractAndSaveTurn,
+} from "@/lib/followups.server";
 import type { Database } from "@/integrations/supabase/types";
 
 // Detect upstream 402 (credits exhausted) / 429 (rate-limited) failures so
@@ -212,6 +217,19 @@ export const Route = createFileRoute("/api/chat")({
         const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
         const userText = lastUserMsg ? extractUserText(lastUserMsg) : "";
 
+        // If the user brought a staged follow-up topic up on their own,
+        // resolve it now — before the model sees the pending block — so
+        // it doesn't ask a redundant "hey, whatever happened with X".
+        const autoResolved = userText
+          ? await autoResolveFollowups(supabase, userId, userText)
+          : [];
+        if (autoResolved.length) {
+          console.log(
+            `[chat] auto-resolved ${autoResolved.length} followup(s) from user initiative: ${autoResolved.join(", ")}`,
+          );
+        }
+
+
         // In-chat model switch: "use gemini pro", "switch to groq", etc.
         // Apply BEFORE resolving the provider so the new model serves this turn.
         let switchedTo: { provider: string; model: string; label: string } | null = null;
@@ -314,6 +332,11 @@ export const Route = createFileRoute("/api/chat")({
         const pendingBlock = (pending ?? [])
           .map((p) => `- ${p.title}${p.due_at ? ` (due ${p.due_at})` : ""}`)
           .join("\n");
+
+        // Follow-ups that are due — model is expected to raise these on
+        // its own initiative this turn, in DED voice, once.
+        const followupBlock = await buildFollowupBlock(supabase, userId);
+
 
         // Calendar events — user-curated dated milestones. Pull a window
         // around "now" so the model has both recent history and near-future
@@ -431,6 +454,9 @@ export const Route = createFileRoute("/api/chat")({
           "",
           "### STAGED TASKS PENDING APPROVAL",
           pendingBlock || "(none)",
+          "",
+          "### PENDING FOLLOW-UPS — DUE NOW (raise ONCE, in DED voice, only if the user hasn't already surfaced it this turn; if they did, acknowledge naturally and move on — never re-ask something they already answered)",
+          followupBlock || "(none)",
           "",
           "### CALENDAR EVENTS (user-curated, authoritative for dates)",
           eventsBlock || "(none)",
@@ -733,8 +759,20 @@ export const Route = createFileRoute("/api/chat")({
               primaryFailed = r.failed;
               if (!primaryFailed && primaryText) {
                 await persistAssistant(primaryText, { tier: "primary" });
+                // Fire-and-forget: label the turn + stage a follow-up
+                // if the exchange described a future outcome worth
+                // checking on. Uses the same primary model.
+                extractAndSaveTurn({
+                  supabase,
+                  userId,
+                  threadId: threadId!,
+                  userText,
+                  assistantText: primaryText,
+                  model: primaryModel,
+                }).catch(() => {});
               }
             }
+
 
             // Calendar citation validator. If the user asked about dated
             // material and the model failed to cite an ISO date from the
@@ -855,6 +893,14 @@ export const Route = createFileRoute("/api/chat")({
                 tier: "fallback",
                 fallback_catalog: usedFallbackLabel,
               });
+              extractAndSaveTurn({
+                supabase,
+                userId,
+                threadId: threadId!,
+                userText,
+                assistantText: fbText,
+                model: primaryModel,
+              }).catch(() => {});
             }
 
             try {
