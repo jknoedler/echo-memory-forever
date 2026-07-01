@@ -421,13 +421,9 @@ export const Route = createFileRoute("/api/chat")({
           console.warn("[chat] failed to persist debug payload:", e);
         }
 
-        // Shared key bundle for every resolveProvider() call.
+        // Shared key bundle for every resolveProvider() call. We ship
+        // OpenRouter only; user-provided keys go via the saved-provider path.
         const providerKeys = {
-          openaiApiKey: process.env.OPENAI_API_KEY,
-          groqApiKey: process.env.GROQ_API_KEY,
-          llamaApiKey: process.env.LLAMA_API_KEY,
-          veniceApiKey: process.env.VENICE_API_KEY,
-          geminiApiKey: process.env.GEMINI_API_KEY,
           openrouterApiKey: process.env.OPENROUTER_API_KEY,
         };
 
@@ -449,9 +445,7 @@ export const Route = createFileRoute("/api/chat")({
           );
         }
 
-        // Tell the model what it is + how to be switched. This lets the user
-        // ask "what model are we running?" and get a real answer, and tells
-        // the model to acknowledge in-chat switches.
+        // Tell the model what it is + how to be switched.
         const switchAck = switchedTo
           ? `\nThe user just asked to switch models. You are now ${switchedTo.label} (${switchedTo.provider}/${switchedTo.model}). Open your reply with a single short line confirming the switch (e.g. "Switched to ${switchedTo.label}."), then answer their question. Do not re-confirm on later turns.`
           : "";
@@ -462,13 +456,13 @@ export const Route = createFileRoute("/api/chat")({
           `provider=${primaryLabel}`,
           `model=${primaryModelId}`,
           `If the user asks "what model are we running" / "which model is this" / "what AI am I talking to", answer with exactly: "${primaryLabel} — ${primaryModelId}". Do not invent a different model name.`,
-          `Users can switch models from chat by saying things like "switch to gemini", "use groq", "change to gpt-4o", "use venice", "switch to gemini 2.5 pro". You don't perform the switch yourself — the platform parses the command before you see it. If the user asks how to switch, list the available built-ins: groq, gemini, openrouter, openai, venice, llama.${switchAck}`,
+          `Users can switch models from chat by saying things like "switch to deepseek", "use qwen", "change to gemini", "use mistral", "switch to nemotron". You don't perform the switch yourself — the platform parses the command before you see it. Shipped models are OpenRouter free-tier only (Llama 3.3 70B, Llama 3.2 3B/Vision, DeepSeek R1/V3, Qwen 2.5 72B, Gemini 2.0 Flash exp, Mistral Small 3.1, Nemotron 70B). Paid providers (OpenAI, Groq, Venice, Anthropic) are BYO-key from the Library.${switchAck}`,
         ].join("\n");
 
-        // Resolve fallback providers (best-effort — never blocks primary).
-        // One dead upstream should never make chat look dead; we walk every
-        // configured built-in after the preferred fallback and stop at the
-        // first provider that actually streams text.
+        // Build fallback candidate list. Primary is always an OpenRouter
+        // free model; if it errors we cycle through every OTHER free model
+        // on the same OpenRouter key. If the user configured a saved BYO
+        // provider as fallback we try that first.
         const fallbackCandidates: ModelCandidate[] = [];
         const seenCandidates = new Set<string>([`${primaryLabel}:${primaryModelId}`]);
         const addFallbackCandidate = (candidate: ModelCandidate | null) => {
@@ -479,32 +473,8 @@ export const Route = createFileRoute("/api/chat")({
           fallbackCandidates.push(candidate);
         };
 
-        const builtinModelId = (kind: FbKind): string => {
-          switch (kind) {
-            case "venice": return "venice-uncensored";
-            case "groq": return "llama-3.3-70b-versatile";
-            case "llama": return "Llama-3.3-70B-Instruct";
-            case "gemini": return "gemini-2.5-flash";
-            case "openrouter": return "meta-llama/llama-3.3-70b-instruct:free";
-            case "openai": return "gpt-4o-mini";
-          }
-        };
-
-        if (fallbackEnvKind) {
-          try {
-            const resolvedFb = resolveProvider(
-              { ...cfg, provider: fallbackEnvKind, model: builtinModelId(fallbackEnvKind) },
-              { ...providerKeys, activeProvider: null },
-            );
-            addFallbackCandidate({
-              model: resolvedFb.model,
-              label: resolvedFb.providerName,
-              modelId: resolvedFb.modelId,
-            });
-          } catch {
-            /* ignore unavailable preferred fallback */
-          }
-        } else if (fallbackProvider) {
+        // 1. User's saved BYO fallback (if configured).
+        if (fallbackProvider) {
           try {
             const resolvedFb = resolveProvider(
               { ...cfg, model: fallbackProvider.default_model ?? cfg.model },
@@ -520,26 +490,30 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        const addBuiltinFallback = (kind: FbKind) => {
-          if (!FB_ENV[kind]) return;
-          try {
-            const resolved = resolveProvider(
-              { ...cfg, provider: kind, model: builtinModelId(kind) },
-              { ...providerKeys, activeProvider: null },
-            );
-            addFallbackCandidate({
-              model: resolved.model,
-              label: resolved.providerName,
-              modelId: resolved.modelId,
-            });
-          } catch {
-            /* ignore unavailable automatic fallback */
+        // 2. Every OTHER OpenRouter free model, in catalog order.
+        //    fallbackEnvKind is always "openrouter" today, but we gate on
+        //    the key being present so a missing OPENROUTER_API_KEY silently
+        //    drops the free-model chain instead of crashing.
+        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
+          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
+          for (const m of OPENROUTER_FREE_MODELS) {
+            if (m.id === primaryModelId) continue;
+            try {
+              const resolved = resolveProvider(
+                { ...cfg, provider: "openrouter", model: m.id },
+                { ...providerKeys, activeProvider: null },
+              );
+              addFallbackCandidate({
+                model: resolved.model,
+                label: resolved.providerName,
+                modelId: resolved.modelId,
+              });
+            } catch {
+              /* skip on resolve error */
+            }
           }
-        };
-        // Walk order: stable hosted routes first, direct Meta Llama later.
-        (["groq", "openrouter", "gemini", "llama", "venice", "openai"] as const).forEach(
-          addBuiltinFallback,
-        );
+        }
+
 
 
 
