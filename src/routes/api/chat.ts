@@ -902,7 +902,6 @@ export const Route = createFileRoute("/api/chat")({
                 model: primaryModel,
               }).catch(() => {});
             }
-            }
 
             try {
               const { summarizeThreadTitle } = await import(
