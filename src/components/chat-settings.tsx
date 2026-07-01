@@ -381,6 +381,9 @@ export function ModelPicker() {
             </span>
             {!activeId && !envOpenAiActive && !envGroqActive && !envLlamaActive && !envVeniceActive && !envGeminiActive && !envOpenRouterActive && <Check className="h-3.5 w-3.5 text-primary" />}
           </button>
+          <div className="mt-1 px-3 pt-2 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+            Free · included with MementØ
+          </div>
           {envQ.data?.groq && !connectedByCat.get("groq") && (
             <button
               type="button"
