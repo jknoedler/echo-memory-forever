@@ -232,17 +232,20 @@ export const Route = createFileRoute("/api/chat")({
             .eq("user_id", userId);
         }
 
-        // Retrieve memories
-        let memoryBlock = "";
+        // Retrieve memories — semantic (top-K relevant) + chronological
+        // (most recent regardless of query). Both matter: semantic surfaces
+        // "that Reno thing from months ago", chronological guarantees
+        // continuity so the model never falsely claims "I have no memory".
+        let semanticBlock = "";
         if (userText) {
           const vec = await embedText(userText);
           if (vec) {
             const { data: hits } = await supabase.rpc("match_memories", {
               query_embedding: vec as unknown as string,
-              match_count: 8,
+              match_count: 15,
             });
             if (hits && hits.length) {
-              memoryBlock = hits
+              semanticBlock = hits
                 .map(
                   (h: { content: string; source: string; created_at: string; similarity: number }) =>
                     `- (${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${h.content}`,
@@ -251,6 +254,29 @@ export const Route = createFileRoute("/api/chat")({
             }
           }
         }
+
+        // Chronological recall — last 30 memories across every thread this
+        // user has. Runs even if OPENAI_API_KEY is missing, so continuity
+        // survives an embedding outage.
+        const { data: recentMems } = await supabase
+          .from("memories")
+          .select("content, source, metadata, created_at")
+          .order("created_at", { ascending: false })
+          .limit(30);
+        const chronologicalBlock = (recentMems ?? [])
+          .map((m) => {
+            const role = (m.metadata as { role?: string } | null)?.role;
+            const tag = role ? `${m.source}:${role}` : m.source;
+            return `- (${tag}, ${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}) ${m.content}`;
+          })
+          .join("\n");
+
+        const memoryBlock = [
+          semanticBlock && `# Semantically relevant to this turn:\n${semanticBlock}`,
+          chronologicalBlock && `# Most recent memories across all threads:\n${chronologicalBlock}`,
+        ]
+          .filter(Boolean)
+          .join("\n\n");
 
         // Recent biometrics (last 8)
         const { data: bios } = await supabase
