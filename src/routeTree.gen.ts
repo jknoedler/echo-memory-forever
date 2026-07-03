@@ -27,6 +27,7 @@ import { Route as ApiPublicBiometricsRouteImport } from './routes/api/public/bio
 import { Route as ApiHealthAiRouteImport } from './routes/api/health.ai'
 import { Route as ApiDebugLastPromptRouteImport } from './routes/api/debug.last-prompt'
 import { Route as AuthenticatedCThreadIdRouteImport } from './routes/_authenticated/c.$threadId'
+import { Route as ApiPublicHooksProcessChatJobsRouteImport } from './routes/api/public/hooks/process-chat-jobs'
 
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
@@ -118,6 +119,12 @@ const AuthenticatedCThreadIdRoute = AuthenticatedCThreadIdRouteImport.update({
   path: '/c/$threadId',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const ApiPublicHooksProcessChatJobsRoute =
+  ApiPublicHooksProcessChatJobsRouteImport.update({
+    id: '/api/public/hooks/process-chat-jobs',
+    path: '/api/public/hooks/process-chat-jobs',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByFullPath {
   '/api/debug/last-prompt': typeof ApiDebugLastPromptRoute
   '/api/health/ai': typeof ApiHealthAiRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
+  '/api/public/hooks/process-chat-jobs': typeof ApiPublicHooksProcessChatJobsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -156,6 +164,7 @@ export interface FileRoutesByTo {
   '/api/debug/last-prompt': typeof ApiDebugLastPromptRoute
   '/api/health/ai': typeof ApiHealthAiRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
+  '/api/public/hooks/process-chat-jobs': typeof ApiPublicHooksProcessChatJobsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -177,6 +186,7 @@ export interface FileRoutesById {
   '/api/debug/last-prompt': typeof ApiDebugLastPromptRoute
   '/api/health/ai': typeof ApiHealthAiRoute
   '/api/public/biometrics': typeof ApiPublicBiometricsRoute
+  '/api/public/hooks/process-chat-jobs': typeof ApiPublicHooksProcessChatJobsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -198,6 +208,7 @@ export interface FileRouteTypes {
     | '/api/debug/last-prompt'
     | '/api/health/ai'
     | '/api/public/biometrics'
+    | '/api/public/hooks/process-chat-jobs'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/api/debug/last-prompt'
     | '/api/health/ai'
     | '/api/public/biometrics'
+    | '/api/public/hooks/process-chat-jobs'
   id:
     | '__root__'
     | '/'
@@ -237,6 +249,7 @@ export interface FileRouteTypes {
     | '/api/debug/last-prompt'
     | '/api/health/ai'
     | '/api/public/biometrics'
+    | '/api/public/hooks/process-chat-jobs'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -251,6 +264,7 @@ export interface RootRouteChildren {
   ApiDebugLastPromptRoute: typeof ApiDebugLastPromptRoute
   ApiHealthAiRoute: typeof ApiHealthAiRoute
   ApiPublicBiometricsRoute: typeof ApiPublicBiometricsRoute
+  ApiPublicHooksProcessChatJobsRoute: typeof ApiPublicHooksProcessChatJobsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -381,6 +395,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCThreadIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/hooks/process-chat-jobs': {
+      id: '/api/public/hooks/process-chat-jobs'
+      path: '/api/public/hooks/process-chat-jobs'
+      fullPath: '/api/public/hooks/process-chat-jobs'
+      preLoaderRoute: typeof ApiPublicHooksProcessChatJobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -419,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDebugLastPromptRoute: ApiDebugLastPromptRoute,
   ApiHealthAiRoute: ApiHealthAiRoute,
   ApiPublicBiometricsRoute: ApiPublicBiometricsRoute,
+  ApiPublicHooksProcessChatJobsRoute: ApiPublicHooksProcessChatJobsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

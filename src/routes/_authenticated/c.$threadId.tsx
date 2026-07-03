@@ -130,11 +130,96 @@ function ChatWindow({
   );
 
 
-  const { messages, sendMessage, status, error } = useChat({
+  const { messages, sendMessage, status, error, setMessages } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
   });
+
+  // In-flight chat_jobs (rescue path). On mount, look for any pending or
+  // processing job on this thread — that means the user asked something,
+  // then closed/reloaded before the assistant finished. Show the thinking
+  // indicator immediately and let realtime deliver the answer.
+  const [hasInFlightJob, setHasInFlightJob] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const { data } = await supabase
+        .from("chat_jobs")
+        .select("id")
+        .eq("thread_id", threadId)
+        .in("status", ["pending", "processing"])
+        .limit(1);
+      if (!cancelled) setHasInFlightJob((data?.length ?? 0) > 0);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [threadId]);
+
+  // Realtime: new assistant messages (from the rescue worker after a
+  // disconnect) and chat_jobs status transitions for this thread.
+  useEffect(() => {
+    const channel = supabase
+      .channel(`thread:${threadId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload) => {
+          const row = payload.new as DBMsg;
+          if (row.role !== "assistant") return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.id === row.id)) return prev;
+            // Dedupe: if the last assistant message already carries the
+            // same text (the live streaming path just persisted it), skip
+            // — otherwise we double-render on the connected client.
+            const rowText = (row.content ?? "").trim();
+            for (let i = prev.length - 1; i >= 0; i--) {
+              const m = prev[i];
+              if (m.role !== "assistant") break;
+              const mt = m.parts
+                .map((p) => (p.type === "text" ? p.text : ""))
+                .join("")
+                .trim();
+              if (mt && rowText && mt === rowText) return prev;
+            }
+            return [...prev, dbToUI(row)];
+          });
+          setHasInFlightJob(false);
+        },
+
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "chat_jobs",
+          filter: `thread_id=eq.${threadId}`,
+        },
+        (payload) => {
+          const row = payload.new as { status: string; error: string | null };
+          if (row.status === "complete" || row.status === "failed") {
+            setHasInFlightJob(false);
+            if (row.status === "failed") {
+              toast.error(row.error || "Reply failed. Try again.");
+            }
+          } else if (row.status === "processing" || row.status === "pending") {
+            setHasInFlightJob(true);
+          }
+        },
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [threadId, setMessages]);
+
 
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AttachmentWithFile[]>([]);
@@ -536,12 +621,15 @@ function ChatWindow({
           {messages.map((m) => (
             <MessageBubble key={m.id} msg={m} />
           ))}
-          {status === "submitted" && (
+          {(status === "submitted" || hasInFlightJob) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              thinking…
+              {hasInFlightJob && status !== "streaming" && status !== "submitted"
+                ? "Finishing your last message…"
+                : "thinking…"}
             </div>
           )}
+
           {error && (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error.message || "Stream failed"}

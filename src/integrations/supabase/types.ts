@@ -86,6 +86,63 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_jobs: {
+        Row: {
+          assistant_message_id: string | null
+          attempts: number
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          locked_at: string | null
+          provider_snapshot: Json | null
+          request_payload: Json
+          started_at: string | null
+          status: string
+          system_snapshot: string | null
+          thread_id: string
+          updated_at: string
+          user_id: string
+          worker_lock: string | null
+        }
+        Insert: {
+          assistant_message_id?: string | null
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          locked_at?: string | null
+          provider_snapshot?: Json | null
+          request_payload: Json
+          started_at?: string | null
+          status?: string
+          system_snapshot?: string | null
+          thread_id: string
+          updated_at?: string
+          user_id: string
+          worker_lock?: string | null
+        }
+        Update: {
+          assistant_message_id?: string | null
+          attempts?: number
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: string
+          locked_at?: string | null
+          provider_snapshot?: Json | null
+          request_payload?: Json
+          started_at?: string | null
+          status?: string
+          system_snapshot?: string | null
+          thread_id?: string
+          updated_at?: string
+          user_id?: string
+          worker_lock?: string | null
+        }
+        Relationships: []
+      }
       events: {
         Row: {
           all_day: boolean
@@ -563,6 +620,33 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_chat_jobs: {
+        Args: { _limit?: number }
+        Returns: {
+          assistant_message_id: string | null
+          attempts: number
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: string
+          locked_at: string | null
+          provider_snapshot: Json | null
+          request_payload: Json
+          started_at: string | null
+          status: string
+          system_snapshot: string | null
+          thread_id: string
+          updated_at: string
+          user_id: string
+          worker_lock: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "chat_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       match_memories: {
         Args: { match_count?: number; query_embedding: string }
         Returns: {
