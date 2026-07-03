@@ -175,10 +175,24 @@ function ChatWindow({
           if (row.role !== "assistant") return;
           setMessages((prev) => {
             if (prev.some((m) => m.id === row.id)) return prev;
+            // Dedupe: if the last assistant message already carries the
+            // same text (the live streaming path just persisted it), skip
+            // — otherwise we double-render on the connected client.
+            const rowText = (row.content ?? "").trim();
+            for (let i = prev.length - 1; i >= 0; i--) {
+              const m = prev[i];
+              if (m.role !== "assistant") break;
+              const mt = m.parts
+                .map((p) => (p.type === "text" ? p.text : ""))
+                .join("")
+                .trim();
+              if (mt && rowText && mt === rowText) return prev;
+            }
             return [...prev, dbToUI(row)];
           });
           setHasInFlightJob(false);
         },
+
       )
       .on(
         "postgres_changes",
