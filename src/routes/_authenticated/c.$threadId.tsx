@@ -560,12 +560,6 @@ function ChatWindow({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onPaste={onPaste}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
               placeholder={recording ? "Listening…" : "Speak. The archive is listening."}
               rows={1}
               disabled={recording || transcribing}
