@@ -21,7 +21,7 @@ export const Route = createFileRoute("/about")({
 
 function About() {
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground pt-[env(safe-area-inset-top)]">
       <header className="border-b border-border/60 backdrop-blur sticky top-0 z-30 bg-background/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4">
           <Mement0Logo to="/" />
