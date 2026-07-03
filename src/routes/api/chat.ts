@@ -693,15 +693,22 @@ export const Route = createFileRoute("/api/chat")({
 
         // Persist an assistant turn (message row + memory embedding +
         // thread bookkeeping). Used for both primary and fallback messages.
+        // Also marks the chat_jobs row complete on the first successful
+        // persist so the background worker doesn't double-generate.
+        let jobMarkedComplete = false;
         async function persistAssistant(text: string, meta?: Record<string, unknown>) {
           if (!text) return;
-          await supabase.from("messages").insert({
-            thread_id: threadId!,
-            user_id: userId,
-            role: "assistant",
-            content: text,
-            parts: null,
-          });
+          const { data: inserted } = await supabase
+            .from("messages")
+            .insert({
+              thread_id: threadId!,
+              user_id: userId,
+              role: "assistant",
+              content: text,
+              parts: null,
+            })
+            .select("id")
+            .maybeSingle();
           const vec = await embedText(text);
           if (vec) {
             await supabase.from("memories").insert({
@@ -717,7 +724,21 @@ export const Route = createFileRoute("/api/chat")({
             .from("threads")
             .update({ last_message_at: new Date().toISOString() })
             .eq("id", threadId!);
+          if (jobId && !jobMarkedComplete) {
+            jobMarkedComplete = true;
+            await supabase
+              .from("chat_jobs")
+              .update({
+                status: "complete",
+                assistant_message_id: inserted?.id ?? null,
+                finished_at: new Date().toISOString(),
+                worker_lock: null,
+              })
+              .eq("id", jobId)
+              .then(() => undefined, () => undefined);
+          }
         }
+
 
         // Build the streamed response. Primary streams normally. If it ends
         // up looking like a refusal OR errors out (rate limit, upstream 5xx)
