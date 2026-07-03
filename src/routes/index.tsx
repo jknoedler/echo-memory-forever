@@ -94,12 +94,6 @@ function Landing() {
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
               placeholder="prepare to assimilate"
               rows={1}
               className="flex-1 resize-none bg-transparent px-3 py-3 text-base md:text-[15px] outline-none placeholder:text-muted-foreground"
