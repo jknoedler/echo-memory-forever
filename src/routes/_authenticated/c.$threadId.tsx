@@ -607,12 +607,15 @@ function ChatWindow({
           {messages.map((m) => (
             <MessageBubble key={m.id} msg={m} />
           ))}
-          {status === "submitted" && (
+          {(status === "submitted" || hasInFlightJob) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              thinking…
+              {hasInFlightJob && status !== "streaming" && status !== "submitted"
+                ? "Finishing your last message…"
+                : "thinking…"}
             </div>
           )}
+
           {error && (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
               {error.message || "Stream failed"}
