@@ -67,7 +67,7 @@ function Landing() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="min-h-screen flex flex-col bg-background text-foreground pt-[env(safe-area-inset-top)]">
       <header className="flex items-center justify-between px-5 py-4">
         <Mement0Logo to="/" />
         <nav className="flex items-center gap-5 text-sm text-muted-foreground">
