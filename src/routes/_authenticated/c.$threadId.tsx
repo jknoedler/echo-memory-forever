@@ -268,6 +268,56 @@ function ChatWindow({
     }
   }, [messages]);
 
+  // Auto-scroll while selecting text with touch near the container edges
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let touchY: number | null = null;
+    let raf = 0;
+    const EDGE = 80;
+    const MAX_SPEED = 18;
+
+    function hasSelection() {
+      const s = window.getSelection();
+      return !!s && !s.isCollapsed && s.toString().length > 0;
+    }
+    function tick() {
+      raf = 0;
+      if (touchY == null || !el || !hasSelection()) return;
+      const rect = el.getBoundingClientRect();
+      let dy = 0;
+      if (touchY < rect.top + EDGE) {
+        dy = -Math.ceil(((rect.top + EDGE - touchY) / EDGE) * MAX_SPEED);
+      } else if (touchY > rect.bottom - EDGE) {
+        dy = Math.ceil(((touchY - (rect.bottom - EDGE)) / EDGE) * MAX_SPEED);
+      }
+      if (dy !== 0) el.scrollTop += dy;
+      raf = requestAnimationFrame(tick);
+    }
+    function onTouchMove(e: TouchEvent) {
+      if (!hasSelection()) return;
+      const t = e.touches[0];
+      if (!t) return;
+      touchY = t.clientY;
+      if (!raf) raf = requestAnimationFrame(tick);
+    }
+    function onTouchEnd() {
+      touchY = null;
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+    }
+    el.addEventListener("touchmove", onTouchMove, { passive: true });
+    el.addEventListener("touchend", onTouchEnd);
+    el.addEventListener("touchcancel", onTouchEnd);
+    return () => {
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+      el.removeEventListener("touchcancel", onTouchEnd);
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
+
   // Autoplay TTS on each newly-completed assistant message (voice mode only)
   useEffect(() => {
     if (!voiceMode) return;
@@ -611,7 +661,7 @@ function ChatWindow({
         <ChatSettings advanced={advanced} setAdvanced={setAdvanced} />
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" ref={scrollRef}>
         <div className="mx-auto max-w-3xl px-4 py-8 space-y-6">
           {messages.length === 0 && (
             <div className="text-center text-muted-foreground py-20">
