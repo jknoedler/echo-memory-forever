@@ -26,8 +26,7 @@ import { DED_PERSONA } from "@/lib/persona";
 import { embedText } from "@/lib/embeddings.server";
 import {
   buildPersonalityBlock,
-  captureDirective,
-  sweepRecalibrations,
+  maybeSynthesizePortrait,
   updateStyleFingerprint,
 } from "@/lib/personality.server";
 import { FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
@@ -659,18 +658,17 @@ export const Route = createFileRoute("/api/chat")({
             });
           }).catch(() => {});
 
-          // Adaptive personality: capture directives + update mannerism
-          // fingerprint + sweep ripe recalibrations. Fire-and-forget so we
-          // don't block the stream.
+          // Adaptive personality: update mannerism fingerprint (cheap, every
+          // turn) and maybe synthesize a fresh nuanced portrait (LLM call,
+          // throttled to every ~10 turns or 24h). Fire-and-forget.
           (async () => {
             try {
               await Promise.all([
-                captureDirective(supabase, userId, threadId, userText),
                 updateStyleFingerprint(supabase, userId, userText),
-                sweepRecalibrations(supabase, userId),
+                maybeSynthesizePortrait(supabase, userId, process.env.OPENROUTER_API_KEY),
               ]);
             } catch {
-              /* personality capture is best-effort */
+              /* personality synthesis is best-effort */
             }
           })();
 
