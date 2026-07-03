@@ -96,6 +96,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:description", content: "DØ MØRE" },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
+      // PWA / installable app hints
+      { name: "application-name", content: "MementØ" },
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "black-translucent" },
+      { name: "apple-mobile-web-app-title", content: "MementØ" },
+      { name: "format-detection", content: "telephone=no" },
       // og:image / twitter:image are injected by the publish pipeline.
       // Do NOT inline them here — see scripts/test-share-images.mjs.
     ],
