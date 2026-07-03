@@ -48,7 +48,7 @@ export const Route = createFileRoute("/api/public/hooks/process-chat-jobs")({
           console.error("[worker] claim_chat_jobs failed:", claimErr);
           return Response.json({ error: claimErr.message }, { status: 500 });
         }
-        const jobs = (claimed ?? []) as JobRow[];
+        const jobs = (claimed ?? []) as unknown as JobRow[];
         if (!jobs.length) {
           return Response.json({ processed: 0, failed: 0 });
         }
