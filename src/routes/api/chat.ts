@@ -237,6 +237,32 @@ export const Route = createFileRoute("/api/chat")({
         const lastUserMsg = [...messages].reverse().find((m) => m.role === "user");
         const userText = lastUserMsg ? extractUserText(lastUserMsg) : "";
 
+        // Create a chat_jobs row up front. If this request completes normally,
+        // we mark it 'complete' at the end. If the client disconnects and the
+        // Worker terminates before we finish, the background cron worker
+        // (/api/public/hooks/process-chat-jobs) reclaims the row after 90s
+        // and finishes the reply so it's waiting for the user on reload.
+        let jobId: string | null = null;
+        try {
+          const { data: job } = await supabase
+            .from("chat_jobs")
+            .insert({
+              user_id: userId,
+              thread_id: threadId,
+              status: "processing",
+              request_payload: { messages, tz: userTz } as unknown as never,
+              started_at: new Date().toISOString(),
+              locked_at: new Date().toISOString(),
+              attempts: 1,
+            })
+            .select("id")
+            .maybeSingle();
+          jobId = job?.id ?? null;
+        } catch (e) {
+          console.warn("[chat] failed to create chat_jobs row (continuing):", e);
+        }
+
+
         // If the user brought a staged follow-up topic up on their own,
         // resolve it now — before the model sees the pending block — so
         // it doesn't ask a redundant "hey, whatever happened with X".
