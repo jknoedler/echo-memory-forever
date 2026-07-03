@@ -1,22 +1,43 @@
-## Scope
 
-Small tactical change, separate from the larger vLLM pivot.
+# Ship MementØ as an installable PWA
 
-1. **OPENROUTER_API_KEY** — already saved via `@secret:`. Nothing for me to do on secrets.
-2. **Default OpenRouter model → free Llama.** Swap `meta-llama/llama-3.3-70b-instruct` (paid) for `meta-llama/llama-3.3-70b-instruct:free`. OpenRouter's `:free` variants are billed at $0. If it 429s or gets pulled, the existing cascade (Groq → Gemini → Venice) still catches it.
+Goal: Add to Home Screen on iOS/Android and "Install app" on desktop Chromium, using the app's existing brand mark. No offline caching, no service worker (per Lovable PWA skill — offline wasn't requested and SWs break the preview).
 
-## Files touched
+## What we'll change
 
-- `src/lib/ai-provider.server.ts` — change `BUILTIN_CONFIG.openrouter.defaultModel` to `meta-llama/llama-3.3-70b-instruct:free`.
-- `src/lib/model-switch.ts` — update the OpenRouter alias default to the `:free` variant. Grok has no free tier on OR — leave as-is.
-- `src/routes/api/health.ai.ts` — same model swap so the health ping hits the free endpoint.
-- `src/routes/api/chat.ts` — only if it hardcodes an OpenRouter model; otherwise no change.
+### 1. Icons in `public/`
+Generate the sizes install prompts actually require, from the existing MementØ mark:
+- `icon-192.png` (192×192, any)
+- `icon-512.png` (512×512, any)
+- `icon-maskable-512.png` (512×512, maskable — padded so Android's mask never clips the Ø)
 
-## Not doing this turn
+Keep the existing `favicon-32.png`, `favicon-48.png`, `apple-touch-icon.png`, `favicon.ico`.
 
-- Not touching the vLLM pivot, ripping out OpenAI/Gemini, or the BYO settings redesign. Waits for a separate go-ahead once your vLLM endpoints are ready.
-- Not adding a free-model picker. If a different free OR model beats Llama 3.3 70B for you, name the id and I will swap it.
+### 2. `public/manifest.webmanifest`
+Upgrade the manifest so Chrome/Edge/Android accept it for install:
+- Add `id: "/"` (stable install identity — safe to set now, before anyone has installed)
+- Add `lang: "en"`, `dir: "ltr"`, `orientation: "portrait"`, `categories: ["productivity","lifestyle"]`
+- Add the 3 new icon entries above (192 any, 512 any, 512 maskable)
+- Keep existing name, short_name, start_url, scope, display: standalone, colors
 
-## Heads up
+### 3. `src/routes/__root.tsx` head
+Add the iOS/Android install meta tags:
+- `apple-mobile-web-app-capable: yes`
+- `apple-mobile-web-app-status-bar-style: black-translucent`
+- `apple-mobile-web-app-title: MementØ`
+- `mobile-web-app-capable: yes`
+- `application-name: MementØ`
+- `format-detection: telephone=no`
 
-Free OpenRouter models are rate-limited hard (about 20 req/min, lower at peak) and can be pulled without notice. Fine as a default because the cascade covers it, but expect 429s under load.
+(Viewport already has `viewport-fit=cover` — good for iOS notch.)
+
+### 4. Audits
+`scripts/audit-manifest.mjs` already validates sizes/type/existence — it will cover the new icons automatically. No script changes needed; CI will fail if any icon is missing or wrong.
+
+## Explicitly NOT doing
+- No service worker, no `vite-plugin-pwa`, no offline caching (SWs break Lovable preview; user asked for installability, not offline).
+- No Capacitor / native shells.
+- No changes to auth, chat, memory, or any app logic.
+
+## After merge
+User publishes, then on iPhone: Safari → Share → Add to Home Screen. On Android/desktop: browser shows an Install prompt. Icon = MementØ mark, launches full-screen, no browser chrome.
