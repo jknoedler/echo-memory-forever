@@ -19,6 +19,7 @@ import {
   streamText,
   type UIMessage,
 } from "ai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { createClient } from "@supabase/supabase-js";
 import { resolveProvider } from "@/lib/ai-provider.server";
 import { parseModelSwitch } from "@/lib/model-switch";
