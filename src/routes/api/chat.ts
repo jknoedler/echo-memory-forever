@@ -882,6 +882,7 @@ export const Route = createFileRoute("/api/chat")({
             async function runModel(
               candidate: ModelCandidate,
               sys: string,
+              opts: { maxRetries?: number } = {},
             ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
               const { model, label } = candidate;
               const messageId = crypto.randomUUID();
@@ -893,7 +894,7 @@ export const Route = createFileRoute("/api/chat")({
                   model,
                   system: sys,
                   messages: convertedMessages,
-                  maxRetries: 0,
+                  maxRetries: opts.maxRetries ?? 0,
                 });
                 for await (const part of run.fullStream) {
                   if (part.type === "error") {
