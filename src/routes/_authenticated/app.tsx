@@ -1,12 +1,9 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useMutation } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-import { Brain } from "lucide-react";
-import { createThread, listThreads } from "@/lib/threads.functions";
-import { Mement0Wordmark } from "@/components/mement0-logo";
-
-
+import { Loader2 } from "lucide-react";
+import { getOrCreateTodayThread } from "@/lib/threads.functions";
 
 export const Route = createFileRoute("/_authenticated/app")({
   component: AppHome,
@@ -14,42 +11,34 @@ export const Route = createFileRoute("/_authenticated/app")({
 
 function AppHome() {
   const navigate = useNavigate();
-  const threadsQ = useQuery({ queryKey: ["threads"], queryFn: () => listThreads() });
+  const kickedRef = useRef(false);
 
-  const createM = useMutation({
-    mutationFn: () => createThread({ data: {} }),
-    onSuccess: (t) => navigate({ to: "/c/$threadId", params: { threadId: t!.id } }),
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  const openTodayM = useMutation({
+    mutationFn: () => {
+      let tz = "UTC";
+      try {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+      } catch {}
+      return getOrCreateTodayThread({ data: { tz } });
+    },
+    onSuccess: (t) => {
+      if (!t) return;
+      navigate({ to: "/c/$threadId", params: { threadId: t.id }, replace: true });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Couldn't open today's chat"),
   });
 
-  // If there are existing threads, jump to the most recent one
   useEffect(() => {
-    if (threadsQ.data && threadsQ.data.length > 0) {
-      navigate({ to: "/c/$threadId", params: { threadId: threadsQ.data[0].id }, replace: true });
-    }
-  }, [threadsQ.data, navigate]);
+    if (kickedRef.current) return;
+    kickedRef.current = true;
+    openTodayM.mutate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="flex flex-1 items-center justify-center px-5">
-      <div className="max-w-md text-center">
-        <div className="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-border bg-card ember-glow">
-          <Brain className="h-6 w-6 text-primary" />
-        </div>
-        <h1 className="mt-6 text-3xl font-display tracking-tight">
-          Begin <Mement0Wordmark />
-        </h1>
-
-        <p className="mt-3 text-muted-foreground">
-          The archive is empty. Start the first thread and every word becomes memory.
-        </p>
-        <button
-          type="button"
-          onClick={() => createM.mutate()}
-          disabled={createM.isPending}
-          className="mt-7 rounded-md bg-primary px-6 py-3 font-medium text-primary-foreground hover:opacity-90 ember-glow disabled:opacity-50"
-        >
-          {createM.isPending ? "…" : "Open the first thread"}
-        </button>
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Opening today's chat…
       </div>
     </div>
   );
