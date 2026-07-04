@@ -9,6 +9,9 @@ import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
 import { OPENROUTER_FREE_MODELS, OPENROUTER_FREE_DEFAULT } from "@/lib/openrouter-free";
+import { PAID_OPENROUTER_MODELS, formatPrice } from "@/lib/paid-models";
+import { getMyAdminStatus } from "@/lib/admin.functions";
+import { TIER_ULTRA_CHEAP, TIER_CHEAP } from "@/lib/model-tiers";
 
 const ADV_KEY = "mement0_advanced";
 
@@ -194,6 +197,8 @@ export function ModelPicker() {
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
+  const adminQ = useQuery({ queryKey: ["admin_status"], queryFn: () => getMyAdminStatus() });
+  const isAdmin = adminQ.data?.isAdmin ?? false;
 
   const activateM = useMutation({
     mutationFn: (v: {
@@ -224,11 +229,16 @@ export function ModelPicker() {
   const activeFreeModel = envOpenRouterActive
     ? OPENROUTER_FREE_MODELS.find((m) => m.id === (settingsQ.data?.model ?? OPENROUTER_FREE_DEFAULT))
     : null;
+  const activePaidModel = envOpenRouterActive
+    ? PAID_OPENROUTER_MODELS.find((m) => m.id === settingsQ.data?.model)
+    : null;
   const label = activeId
     ? `${activeCat?.name ?? "Custom"} · ${settingsQ.data?.model || activeProvider?.default_model || "—"}`
-    : activeFreeModel
-      ? `Free · ${activeFreeModel.label}`
-      : "Free · Llama 3.3 70B";
+    : activePaidModel
+      ? `Admin · ${activePaidModel.label}`
+      : activeFreeModel
+        ? `Free · ${activeFreeModel.label}`
+        : "Free · Llama 3.3 70B";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
@@ -294,7 +304,9 @@ export function ModelPicker() {
                   >
                     <span className="min-w-0">
                       <span className="block font-medium truncate">{m.label}</span>
-                      <span className="block text-[10px] truncate">{m.hint}</span>
+                      <span className="block text-[10px] truncate">
+                        {m.hint} · $0 · {isAdmin ? "no limit" : "unlimited"}
+                      </span>
                     </span>
                     {isThisActive ? (
                       <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
@@ -308,6 +320,79 @@ export function ModelPicker() {
               })}
             </>
           )}
+
+          {isAdmin && envQ.data?.openrouter && (
+            <>
+              <div className="my-1 h-px bg-border" />
+              <div className="px-3 pt-1 pb-1 text-[9px] uppercase tracking-widest text-primary">
+                Admin · any OpenRouter model
+              </div>
+              <div className="px-3 pb-1 text-[10px] text-muted-foreground/60 leading-snug">
+                No rate limits, no price ceiling. Bills the project key.
+              </div>
+              {PAID_OPENROUTER_MODELS.map((m) => {
+                const isThisActive =
+                  envOpenRouterActive && settingsQ.data?.model === m.id;
+                return (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => pickFreeModel(m.id)}
+                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-xs hover:bg-secondary ${
+                      isThisActive ? "text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    <span className="min-w-0">
+                      <span className="block font-medium truncate">{m.label}</span>
+                      <span className="block text-[10px] truncate">
+                        {formatPrice(m)} · no limit
+                      </span>
+                    </span>
+                    {isThisActive ? (
+                      <Check className="h-3.5 w-3.5 shrink-0 text-primary" />
+                    ) : (
+                      <span
+                        className={`text-[9px] uppercase tracking-widest ${
+                          m.category === "premium"
+                            ? "text-destructive"
+                            : m.category === "mid"
+                              ? "text-amber-500"
+                              : "text-muted-foreground"
+                        }`}
+                      >
+                        {m.category === "ultra_cheap"
+                          ? "¢"
+                          : m.category === "cheap"
+                            ? "$"
+                            : m.category === "mid"
+                              ? "$$"
+                              : "$$$"}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </>
+          )}
+
+          {/* Fallback tier summary — shown to everyone so they know what
+              kicks in when the free chain is exhausted. */}
+          <div className="my-1 h-px bg-border" />
+          <div className="px-3 pt-1 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">
+            Fallback tiers
+          </div>
+          <div className="px-3 pb-2 text-[10px] text-muted-foreground/60 leading-snug space-y-0.5">
+            <div>
+              <span className="text-foreground/80">Ultra-cheap</span> · ≤ $
+              {TIER_ULTRA_CHEAP.outputCeilingPerMTokens.toFixed(2)}/M out · everyone ·{" "}
+              {isAdmin ? "no limit" : `${TIER_ULTRA_CHEAP.hourlyLimit}/hr`}
+            </div>
+            <div>
+              <span className="text-foreground/80">Cheap</span> · ≤ $
+              {TIER_CHEAP.outputCeilingPerMTokens.toFixed(2)}/M out · paid only ·{" "}
+              {isAdmin ? "no limit" : `${TIER_CHEAP.hourlyLimit}/hr`}
+            </div>
+          </div>
 
           <div className="my-1 h-px bg-border" />
           <div className="px-3 pt-1 pb-1 text-[9px] uppercase tracking-widest text-muted-foreground/70">

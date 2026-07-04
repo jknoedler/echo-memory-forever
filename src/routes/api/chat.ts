@@ -197,6 +197,16 @@ export const Route = createFileRoute("/api/chat")({
           .maybeSingle();
         const isPaidUser = (settings as { is_paid?: boolean } | null)?.is_paid ?? false;
 
+        // Admin check — admins bypass the free-tier sanitizer, ignore all
+        // rate limits, and can select any paid OpenRouter model as primary.
+        const { data: adminRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .eq("role", "admin")
+          .maybeSingle();
+        const isAdmin = !!adminRow;
+
 
         const cfg = {
           provider: settings?.provider ?? "lovable",
@@ -654,7 +664,7 @@ export const Route = createFileRoute("/api/chat")({
         let primaryLabel = "primary";
         let primaryModelId = "";
         try {
-          const resolved = resolveProvider(cfg, { ...providerKeys, activeProvider });
+          const resolved = resolveProvider(cfg, { ...providerKeys, activeProvider, bypassSanitize: isAdmin });
           primaryModel = resolved.model;
           primaryLabel = resolved.providerName;
           primaryModelId = resolved.modelId;
@@ -1095,7 +1105,7 @@ export const Route = createFileRoute("/api/chat")({
             let usedFallbackLabel: string | null = null;
             let usedFallbackTier: string | null = null;
             for (const candidate of fallbackCandidates) {
-              if (candidate.tier && candidate.hourlyLimit) {
+              if (candidate.tier && candidate.hourlyLimit && !isAdmin) {
                 const check = await bumpModelUsage(
                   supabase,
                   candidate.tier,

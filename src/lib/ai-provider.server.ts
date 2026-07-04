@@ -37,6 +37,8 @@ export type BuiltinKind = "openrouter";
 type ResolveOpts = {
   openrouterApiKey?: string;
   activeProvider?: ActiveProvider | null;
+  /** Admins bypass the free-tier allowlist and can hit any OR model. */
+  bypassSanitize?: boolean;
 };
 
 const OPENROUTER = {
@@ -49,8 +51,9 @@ export function builtinDefaultModel(_kind: BuiltinKind): string {
   return OPENROUTER.defaultModel;
 }
 
-function buildOpenRouter(apiKey: string, modelOverride?: string): ResolvedProvider {
-  const modelId = sanitizeOpenRouterModel(modelOverride || OPENROUTER.defaultModel);
+function buildOpenRouter(apiKey: string, modelOverride?: string, bypassSanitize = false): ResolvedProvider {
+  const raw = (modelOverride || OPENROUTER.defaultModel).trim();
+  const modelId = bypassSanitize ? raw : sanitizeOpenRouterModel(raw);
   const provider = createOpenAICompatible({
     name: "openrouter",
     baseURL: OPENROUTER.baseURL,
@@ -114,5 +117,5 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
       "OpenRouter is not configured. Set OPENROUTER_API_KEY, or add your own key from the Library.",
     );
   }
-  return buildOpenRouter(key, cfg.model || undefined);
+  return buildOpenRouter(key, cfg.model || undefined, opts.bypassSanitize);
 }
