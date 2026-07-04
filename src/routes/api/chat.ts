@@ -711,7 +711,6 @@ export const Route = createFileRoute("/api/chat")({
           { envKey: process.env.GROQ_API_KEY, label: "groq", baseURL: "https://api.groq.com/openai/v1", modelId: "llama-3.3-70b-versatile" },
           { envKey: process.env.GEMINI_API_KEY, label: "gemini", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", modelId: "gemini-2.5-flash" },
           { envKey: process.env.OPENAI_API_KEY, label: "openai", baseURL: "https://api.openai.com/v1", modelId: "gpt-4o-mini" },
-          { envKey: process.env.VENICE_API_KEY, label: "venice", baseURL: "https://api.venice.ai/api/v1", modelId: "venice-uncensored" },
         ];
         for (const fb of directFallbacks) {
           if (!fb.envKey) continue;
@@ -883,6 +882,7 @@ export const Route = createFileRoute("/api/chat")({
             async function runModel(
               candidate: ModelCandidate,
               sys: string,
+              opts: { maxRetries?: number } = {},
             ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
               const { model, label } = candidate;
               const messageId = crypto.randomUUID();
@@ -894,7 +894,7 @@ export const Route = createFileRoute("/api/chat")({
                   model,
                   system: sys,
                   messages: convertedMessages,
-                  maxRetries: 0,
+                  maxRetries: opts.maxRetries ?? 0,
                 });
                 for await (const part of run.fullStream) {
                   if (part.type === "error") {
@@ -942,7 +942,7 @@ export const Route = createFileRoute("/api/chat")({
             let primaryText = "";
             let primaryFailed = false;
             if (!preempt) {
-              const r = await runModel(primaryCandidate, system);
+              const r = await runModel(primaryCandidate, system, { maxRetries: 2 });
               primaryText = r.text;
               primaryFailed = r.failed;
               if (!primaryFailed && primaryText) {
