@@ -909,7 +909,11 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
     (p): p is { type: "file"; mediaType: string; url: string } => p.type === "file",
   );
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+      data-msg-id={msg.id}
+    >
+
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap space-y-2 ${
           isUser
