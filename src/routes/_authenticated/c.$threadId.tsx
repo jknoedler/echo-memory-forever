@@ -953,7 +953,7 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
             )}
           </div>
         )}
-        {isUser ? text : <RecallLinkified text={text} />}
+        {isUser ? text : <AssistantContent text={text} />}
       </div>
     </div>
   );
