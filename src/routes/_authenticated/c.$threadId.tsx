@@ -374,7 +374,7 @@ function ChatWindow({
       const ms = next.getTime() - now.getTime();
       timer = setTimeout(() => {
         try {
-          sessionStorage.setItem("mement0_rollover_draft", input);
+          sessionStorage.setItem("mement0_rollover_draft", inputRef2.current);
         } catch {
           /* private mode etc. */
         }
