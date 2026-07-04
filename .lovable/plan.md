@@ -1,76 +1,87 @@
-# Daily chats with sub-chats + hour markers + AI recall
 
-Replace the flat thread list with one chat per day. Sub-chats nest inside today when you want separation. Within each day, subtle hour markers divide the transcript so you can scroll to a specific time. At the user's local midnight the day rolls over: brief loading screen, fresh chat for the new day, last ~10 messages silently carried as context. And the AI itself can fetch any past moment on demand — you shouldn't ever *have* to scroll to find something.
+# Tiered model fallback with price ceilings
 
-## How it works for the user
+## Goal
 
-- **Opening the app** lands you in *today's chat*, always.
-- **"New" button** creates a *sub-chat inside today*. All of today's chats (root + sub-chats) group together in the sidebar.
-- **Sidebar** grouped by day: Today, Yesterday, then dated headers. Sub-chats indent under their day. Older days collapse under "Earlier".
-- **Hour markers** inside every chat: thin dividers appear inline in the transcript at each hour boundary — `— 2 PM —`, `— 3 PM —`. Empty hours are skipped. A tiny hour rail on the right edge lets you jump-scroll to any hour of the day.
-- **Midnight rollover**: mid-message when the clock rolls → short "New day…" loading screen (~1s) → new day's chat opens, draft text preserved and pasted into the composer.
-- **Context carry**: every new day-root silently inherits the last ~10 messages of the previous day's root as background context for the model. Not shown in the visible transcript.
-- **AI recall (this is the point)**: ask "what did I say about the espresso machine last Thursday?" and the model retrieves it directly from your archive and quotes it back. No manual searching required.
-- **Archived days** are read-only in the sidebar. Click "continue this thread" to reopen for writing.
+When free OpenRouter models get 429'd, gracefully step down to paid models — but keep costs pennies-per-day per user by enforcing hard price ceilings + per-tier rate limits.
 
-## Layout sketch
+## Tiers
 
-```text
-┌──────────────────────────────┐  ┌───────────────────────────┐
-│ + New sub-chat               │  │  Today · Wed Nov 12       │
-├──────────────────────────────┤  │ ─── 9 AM ─────────────    │
-│ TODAY                        │  │  you: morning notes…      │
-│ • Main                    ●  │  │  DED: got it              │
-│   ↳ Debugging build          │  │ ─── 11 AM ────────────    │
-│   ↳ Grocery list             │  │  you: quick q…            │
-│ YESTERDAY                    │  │ ─── 2 PM ─────────────    │
-│ • Main                       │  │  you: …                   │
-│ EARLIER                      │  │                       │9│ │
-│ ▸ Wed · Nov 12               │  │                       │11││
-│ ▸ Tue · Nov 11               │  │                       │2 ││
-└──────────────────────────────┘  └───────────────────────────┘
-```
+| Tier | Price ceiling (output $/M tok) | Who can use | Rate limit |
+|---|---|---|---|
+| **T0 — Free** | $0 | Everyone | Unlimited |
+| **T1 — Ultra-cheap** | ≤ $0.15/M output | Everyone (free + paid users) | 20 messages / hour / user |
+| **T2 — Cheap** | ≤ $1.00/M output | Paid users only | 100 messages / hour / user |
+| **T3+** | anything above | Nobody | Blocked |
 
-## Technical plan
+Free users who exhaust T1 hourly quota get a "come back in X min or upgrade" message. Paid users fall through to T2.
 
-**Schema (migration)**
-- `threads` gains: `day_key date`, `parent_thread_id uuid null references threads(id)`, `is_daily_root bool default false`, `carried_from_thread_id uuid null`, `timezone text`.
-- Unique partial index: one daily root per `(user_id, day_key)` where `is_daily_root = true`.
-- Backfill: `day_key = created_at::date`, mark existing threads as daily roots.
-- Nightly cron: flip `continuity_status = 'archived'` on roots where `day_key < current_date` and status is `open`.
+## Fallback order (per chat request)
 
-**Server functions (`src/lib/threads.functions.ts`)**
-- `getOrCreateTodayThread({ tz })` — returns today's daily root, creates it if missing, sets `carried_from_thread_id` to yesterday's root.
-- `createSubThread({ parentId })` — creates a sub-chat under a day root; blocks if parent is archived.
-- `listThreadsGrouped()` — returns `[{ dayKey, root, subs[] }]` newest-first with a lazy "load older" cursor.
+1. Cycle **all T0 free** models on the OpenRouter allowlist (`src/lib/openrouter-free.ts`). Short retry per model, then move to next free one. Only after every free model 429s do we spend money.
+2. Drop to **T1 ultra-cheap** (with quota check).
+3. If paid user: drop to **T2 cheap** (with quota check).
+4. If everything failed / user is over quota: friendly error toast, no charge.
 
-**AI recall (`src/lib/memories.functions.ts` + `src/routes/api/chat.ts`)**
-- Existing embeddings pipeline already indexes messages. Add a tool the model can call mid-turn: `recall_from_archive({ query, day_range?, thread_id? })` that runs a hybrid search (pgvector `match_memories` + a lexical `ILIKE` fallback) across the user's entire message history and returns the top hits with `thread_id`, `timestamp`, and quoted content.
-- Chat system prompt updated with a short instruction: "Before answering questions about the past, call `recall_from_archive` — do not guess. Quote the retrieved text with its date/time."
-- When the model quotes a recalled snippet, render an inline "Jump to this moment" link in the assistant bubble that deep-links to `/c/{threadId}?t={messageId}` and scrolls the transcript to that hour marker.
+## Model shortlist
 
-**Chat pipeline (`src/routes/api/chat.ts`)**
-- When building context for a daily root, if `carried_from_thread_id` is set and this is the first user turn, prepend the last 10 messages from that prior root as system-tagged "prior day context" (not persisted).
-- Sub-chats do not carry context from siblings.
+**T0 (existing free allowlist, unchanged):** Llama 3.3 70B, Qwen3, GPT-OSS, Nemotron, Hermes, Gemma, etc.
 
-**Frontend**
-- `/app` calls `getOrCreateTodayThread` with `Intl.DateTimeFormat().resolvedOptions().timeZone` and redirects to `/c/{todayId}`.
-- `/day-turnover` transient route: loading screen, awaits new day root, redirects. Draft passed via `sessionStorage`.
-- `app-shell.tsx` sidebar: grouped renderer; "New thread" → "New sub-chat" when inside a day.
-- `c.$threadId.tsx`:
-  - `?t={messageId}` search param scrolls to that message on mount and briefly highlights it.
-  - Hour-marker renderer: walk the sorted messages; when the local hour changes, emit a divider row before the next message. Hour rail on the right computes which hours have any messages and renders clickable ticks (`scrollIntoView` on the divider).
-  - Restore carried draft from `sessionStorage`.
-- `useDayRollover` hook: computes ms-until-local-midnight, on fire stashes the draft and navigates to `/day-turnover`. Re-arms on visibility change and after each rollover.
+**T1 ultra-cheap (≤ $0.15 output):**
+- `meta-llama/llama-3.1-8b-instruct` — ~$0.02 in / $0.05 out
+- `google/gemini-2.0-flash-lite-001` — $0.075 in / $0.30 out ← borderline, will verify against live OpenRouter price at build time and drop if over
+- `mistralai/ministral-8b` — ~$0.10 / $0.10
 
-**Edge cases**
-- Tab open across midnight → watcher fires seamlessly.
-- Tab closed at 11pm, reopened 2am next day → `/app` creates today's root with carry.
-- Timezone travel → tz captured per-thread; each visit uses browser's current tz.
-- Sub-chat open at midnight → rolls over to new day's root.
-- Recall across archived + active threads works identically (same message table).
+**T2 cheap (≤ $1.00 output, paid users only):**
+- `openai/gpt-4.1-nano` — $0.10 / $0.40
+- `openai/gpt-4o-mini` — $0.15 / $0.60
+- `anthropic/claude-3-haiku` — $0.25 / $1.25 ← over, drop
 
-## Out of scope
-- Search across archived days as a manual UI (AI recall replaces it).
-- Renaming daily roots (auto-titled by date + optional summary).
-- Merging sub-chats.
+Actual list is confirmed against OpenRouter's `/models` endpoint at build time (see technical section) so nothing over ceiling can sneak in.
+
+All routed through OpenRouter using the existing `OPENROUTER_API_KEY` — no new provider integrations.
+
+## Cost sanity check
+
+Assumptions per active user: ~50 messages/day, ~2K tokens each = ~100K tokens/day.
+
+- If T0 covers them: **$0**
+- If they fall to T1 all day: ~$0.03/day/user
+- If paid user falls to T2 all day: ~$0.10/day/user
+
+With rate limits (T1 = 20/hr, T2 = 100/hr paid), worst-case daily spend per user is capped at cents. **Yes, this is sustainable for a broad free user base**, especially since T0 handles most traffic and T1/T2 only kick in during OpenRouter's free-tier throttle windows.
+
+The real risk isn't per-user cost — it's an abusive user hammering the endpoint. The hourly rate limit is what keeps that bounded.
+
+## User-facing changes
+
+- **Chat error messages** get clearer: "Free models busy, using [tier name]" as a subtle badge under the assistant reply when we fall to T1/T2, so users understand why quality/speed shifted.
+- **Rate-limit hit:** friendly message ("You've hit the hourly limit on paid backups — free models will retry in X min, or upgrade for higher limits") instead of a raw 429.
+- **Settings > Library:** existing BYO-key path stays unchanged — users with their own OpenRouter key bypass all ceilings and quotas (they're paying).
+
+## Technical section
+
+### Files to add
+- `src/lib/model-tiers.ts` — declares T0/T1/T2 model lists + price ceilings + rate-limit configs. Single source of truth.
+- `src/lib/rate-limit.server.ts` — simple per-user hourly counter table in Supabase (`user_model_usage`: user_id, tier, hour_bucket, count). Increment + check on each paid-tier call.
+
+### Files to edit
+- `src/routes/api/chat.ts` — replace current fallback chain with tiered walker:
+  1. loop T0 allowlist (existing behavior, already there)
+  2. on exhaustion, check rate limit → call T1
+  3. on exhaustion, check paid status + rate limit → call T2
+  4. return structured error with tier info so UI can badge it
+- `src/lib/openrouter-free.ts` — no change (T0 stays as-is).
+- `src/lib/ai-provider.server.ts` — add a `buildOpenRouterPaid(modelId)` variant that bypasses `sanitizeOpenRouterModel` (which currently forces everything to free-only).
+- `src/routes/api/health.ai.ts` — extend health check to ping one T1 and one T2 model too.
+
+### Database
+- New migration: `user_model_usage` table (user_id uuid, tier text, hour_bucket timestamptz, count int, PK on user_id+tier+hour_bucket). RLS: users can read their own row; server writes via service role. GRANT SELECT to authenticated, ALL to service_role.
+- New column on `user_settings`: `is_paid boolean default false` — toggled manually for now (no billing integration yet).
+
+### Price-ceiling enforcement
+On server start (or lazily cached for 1hr), fetch `https://openrouter.ai/api/v1/models` and filter each tier's declared model IDs by their live `pricing.completion` field. Any model over ceiling is dropped from the tier at runtime — so if OpenRouter raises a price, we don't get surprise-billed.
+
+### Out of scope
+- Actual paid-user billing / Stripe. `is_paid` is a manual flag until a separate billing plan.
+- Non-OpenRouter providers (Groq/Gemini/OpenAI direct) — those direct fallbacks in `chat.ts` will be removed since we're consolidating on OpenRouter for cost control. Confirm before I strip them.

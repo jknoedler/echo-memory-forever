@@ -191,10 +191,12 @@ export const Route = createFileRoute("/api/chat")({
         const { data: settings } = await supabase
           .from("user_settings")
           .select(
-            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id, fallback_provider_kind",
+            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id, fallback_provider_kind, is_paid",
           )
           .eq("user_id", userId)
           .maybeSingle();
+        const isPaidUser = (settings as { is_paid?: boolean } | null)?.is_paid ?? false;
+
 
         const cfg = {
           provider: settings?.provider ?? "lovable",
@@ -638,7 +640,16 @@ export const Route = createFileRoute("/api/chat")({
 
         // Resolve primary provider
         type ChatModel = ReturnType<typeof resolveProvider>["model"];
-        type ModelCandidate = { model: ChatModel; label: string; modelId: string };
+        type ModelCandidate = {
+          model: ChatModel;
+          label: string;
+          modelId: string;
+          /** Optional paid tier — presence triggers per-user hourly rate limit check. */
+          tier?: "ultra_cheap" | "cheap";
+          tierLabel?: string;
+          hourlyLimit?: number;
+        };
+
         let primaryModel: ChatModel;
         let primaryLabel = "primary";
         let primaryModelId = "";
@@ -701,11 +712,64 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        // 2. Emergency direct-provider fallbacks FIRST — these are almost
-        //    always healthy (Groq/Gemini) and answer in <1s. If OpenRouter
-        //    is 429ing across its whole free tier (common), cycling through
-        //    ~10 free models before trying Groq wastes 20+ seconds and the
-        //    browser gives up. Order: Groq (fastest) → Gemini → OpenAI → Venice.
+        // 2. Cycle every OTHER OpenRouter free model FIRST. User directive:
+        //    always exhaust every free option before spending a cent.
+        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
+          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
+          for (const m of OPENROUTER_FREE_MODELS) {
+            if (m.id === primaryModelId) continue;
+            try {
+              const resolved = resolveProvider(
+                { ...cfg, provider: "openrouter", model: m.id },
+                { ...providerKeys, activeProvider: null },
+              );
+              addFallbackCandidate({
+                model: resolved.model,
+                label: resolved.providerName,
+                modelId: resolved.modelId,
+              });
+            } catch {
+              /* skip on resolve error */
+            }
+          }
+        }
+
+        // 3. Paid OpenRouter tiers — ONLY after every free model has failed.
+        //    T1 ultra-cheap (everyone, ≤ $0.15/M output, 20/hr cap).
+        //    T2 cheap (paid users only, ≤ $1/M output, 100/hr cap).
+        //    Rate-limit check happens at stream time (inside runModel loop
+        //    below) so we don't reserve quota for a candidate we may never
+        //    reach. Candidates are just registered here as raw OR models
+        //    with the paid variant of the provider (no free-tier sanitize).
+        if (FB_ENV.openrouter) {
+          const { tiersForUser } = await import("@/lib/model-tiers");
+          for (const tier of tiersForUser(isPaidUser)) {
+            for (const modelId of tier.models) {
+              try {
+                const paidOR = createOpenAICompatible({
+                  name: `openrouter-${tier.tier}`,
+                  baseURL: "https://openrouter.ai/api/v1",
+                  headers: { Authorization: `Bearer ${FB_ENV.openrouter}` },
+                });
+                addFallbackCandidate({
+                  model: paidOR(modelId) as ChatModel,
+                  label: `openrouter-${tier.tier}`,
+                  modelId,
+                  tier: tier.tier,
+                  tierLabel: tier.label,
+                  hourlyLimit: tier.hourlyLimit,
+                });
+              } catch {
+                /* skip */
+              }
+            }
+          }
+        }
+
+        // 4. Emergency direct-provider fallbacks — last resort ONLY if
+        //    every free AND every allowed paid OR model failed. Groq is
+        //    still on the free-hobbyist tier so it counts as effectively
+        //    free; Gemini/OpenAI are paid but bounded by their own keys.
         type DirectFb = { envKey: string | undefined; label: string; baseURL: string; modelId: string };
         const directFallbacks: DirectFb[] = [
           { envKey: process.env.GROQ_API_KEY, label: "groq", baseURL: "https://api.groq.com/openai/v1", modelId: "llama-3.3-70b-versatile" },
@@ -730,27 +794,6 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        // 3. THEN cycle every OTHER OpenRouter free model, in catalog order.
-        //    Runs only if all direct fallbacks also failed (unlikely).
-        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
-          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
-          for (const m of OPENROUTER_FREE_MODELS) {
-            if (m.id === primaryModelId) continue;
-            try {
-              const resolved = resolveProvider(
-                { ...cfg, provider: "openrouter", model: m.id },
-                { ...providerKeys, activeProvider: null },
-              );
-              addFallbackCandidate({
-                model: resolved.model,
-                label: resolved.providerName,
-                modelId: resolved.modelId,
-              });
-            } catch {
-              /* skip on resolve error */
-            }
-          }
-        }
 
 
 
@@ -1045,16 +1088,39 @@ export const Route = createFileRoute("/api/chat")({
             }
 
             // Fallback path. Try every configured candidate until one produces text.
+            // Paid tiers (candidate.tier set) go through a per-user hourly
+            // rate limit before we spend on them.
+            const { bumpModelUsage } = await import("@/lib/rate-limit.server");
             let fbText = "";
             let usedFallbackLabel: string | null = null;
+            let usedFallbackTier: string | null = null;
             for (const candidate of fallbackCandidates) {
+              if (candidate.tier && candidate.hourlyLimit) {
+                const check = await bumpModelUsage(
+                  supabase,
+                  candidate.tier,
+                  candidate.hourlyLimit,
+                );
+                if (!check.allowed) {
+                  console.warn(
+                    `[chat] user ${userId} over hourly cap for ${candidate.tier} (${check.currentCount}/${candidate.hourlyLimit}) — skipping ${candidate.modelId}`,
+                  );
+                  continue;
+                }
+              }
               const fb = await runModel(candidate, system + FALLBACK_SYSTEM_SUFFIX);
               if (!fb.failed && fb.text) {
                 fbText = fb.text;
                 usedFallbackLabel = candidate.label;
+                usedFallbackTier = candidate.tierLabel ?? null;
+                console.log(
+                  `[chat] fallback served by ${candidate.label}/${candidate.modelId}${candidate.tierLabel ? ` (${candidate.tierLabel})` : ""}`,
+                );
                 break;
               }
             }
+            void usedFallbackTier;
+
             if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
               const mid = crypto.randomUUID();
