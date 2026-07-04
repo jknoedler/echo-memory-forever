@@ -722,8 +722,37 @@ export const Route = createFileRoute("/api/chat")({
             } catch {
               /* skip on resolve error */
             }
+        }
+
+        // 3. Emergency fallbacks — direct provider endpoints (OpenAI-compatible)
+        //    for any project-level key that's present. These are the "last
+        //    resort" so if OpenRouter is 429ing across every free model, chat
+        //    still answers. Order: Groq (fastest) → Gemini → OpenAI → Venice.
+        type DirectFb = { envKey: string | undefined; label: string; baseURL: string; modelId: string };
+        const directFallbacks: DirectFb[] = [
+          { envKey: process.env.GROQ_API_KEY, label: "groq", baseURL: "https://api.groq.com/openai/v1", modelId: "llama-3.3-70b-versatile" },
+          { envKey: process.env.GEMINI_API_KEY, label: "gemini", baseURL: "https://generativelanguage.googleapis.com/v1beta/openai", modelId: "gemini-2.5-flash" },
+          { envKey: process.env.OPENAI_API_KEY, label: "openai", baseURL: "https://api.openai.com/v1", modelId: "gpt-4o-mini" },
+          { envKey: process.env.VENICE_API_KEY, label: "venice", baseURL: "https://api.venice.ai/api/v1", modelId: "venice-uncensored" },
+        ];
+        for (const fb of directFallbacks) {
+          if (!fb.envKey) continue;
+          try {
+            const provider = createOpenAICompatible({
+              name: fb.label,
+              baseURL: fb.baseURL,
+              headers: { Authorization: `Bearer ${fb.envKey}` },
+            });
+            addFallbackCandidate({
+              model: provider(fb.modelId) as ChatModel,
+              label: fb.label,
+              modelId: fb.modelId,
+            });
+          } catch {
+            /* skip */
           }
         }
+
 
 
 
