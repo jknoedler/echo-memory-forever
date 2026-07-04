@@ -28,7 +28,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(SIDEBAR_KEY) === "1";
   });
-  const [showAll, setShowAll] = useState(false);
+  const [olderOpen, setOlderOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(OLDER_OPEN_KEY) === "1";
+  });
+
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
