@@ -1,16 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, CalendarDays, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Brain, CalendarDays, ChevronDown, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
 import { BrandClock } from "@/components/brand-clock";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { supabase } from "@/integrations/supabase/client";
-import { createThread, deleteThread, listThreads } from "@/lib/threads.functions";
+import {
+  createSubThread,
+  deleteThread,
+  getOrCreateTodayThread,
+  listThreadsGrouped,
+} from "@/lib/threads.functions";
 
 const SIDEBAR_KEY = "mement0_sidebar_collapsed";
-const VISIBLE_THREADS = 10;
+const OLDER_OPEN_KEY = "mement0_older_open";
+
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();

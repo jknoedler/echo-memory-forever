@@ -22,6 +22,7 @@ import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticat
 import { Route as AuthenticatedPersonalityRouteImport } from './routes/_authenticated/personality'
 import { Route as AuthenticatedLibraryRouteImport } from './routes/_authenticated/library'
 import { Route as AuthenticatedEventsRouteImport } from './routes/_authenticated/events'
+import { Route as AuthenticatedDayTurnoverRouteImport } from './routes/_authenticated/day-turnover'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as ApiPublicBiometricsRouteImport } from './routes/api/public/biometrics'
 import { Route as ApiHealthAiRouteImport } from './routes/api/health.ai'
@@ -94,6 +95,12 @@ const AuthenticatedEventsRoute = AuthenticatedEventsRouteImport.update({
   path: '/events',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedDayTurnoverRoute =
+  AuthenticatedDayTurnoverRouteImport.update({
+    id: '/day-turnover',
+    path: '/day-turnover',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedAppRoute = AuthenticatedAppRouteImport.update({
   id: '/app',
   path: '/app',
@@ -131,6 +138,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/day-turnover': typeof AuthenticatedDayTurnoverRoute
   '/events': typeof AuthenticatedEventsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/personality': typeof AuthenticatedPersonalityRoute
@@ -151,6 +159,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/app': typeof AuthenticatedAppRoute
+  '/day-turnover': typeof AuthenticatedDayTurnoverRoute
   '/events': typeof AuthenticatedEventsRoute
   '/library': typeof AuthenticatedLibraryRoute
   '/personality': typeof AuthenticatedPersonalityRoute
@@ -173,6 +182,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/_authenticated/app': typeof AuthenticatedAppRoute
+  '/_authenticated/day-turnover': typeof AuthenticatedDayTurnoverRoute
   '/_authenticated/events': typeof AuthenticatedEventsRoute
   '/_authenticated/library': typeof AuthenticatedLibraryRoute
   '/_authenticated/personality': typeof AuthenticatedPersonalityRoute
@@ -195,6 +205,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/app'
+    | '/day-turnover'
     | '/events'
     | '/library'
     | '/personality'
@@ -215,6 +226,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/app'
+    | '/day-turnover'
     | '/events'
     | '/library'
     | '/personality'
@@ -236,6 +248,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/_authenticated/app'
+    | '/_authenticated/day-turnover'
     | '/_authenticated/events'
     | '/_authenticated/library'
     | '/_authenticated/personality'
@@ -360,6 +373,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedEventsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/day-turnover': {
+      id: '/_authenticated/day-turnover'
+      path: '/day-turnover'
+      fullPath: '/day-turnover'
+      preLoaderRoute: typeof AuthenticatedDayTurnoverRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/app': {
       id: '/_authenticated/app'
       path: '/app'
@@ -407,6 +427,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAppRoute: typeof AuthenticatedAppRoute
+  AuthenticatedDayTurnoverRoute: typeof AuthenticatedDayTurnoverRoute
   AuthenticatedEventsRoute: typeof AuthenticatedEventsRoute
   AuthenticatedLibraryRoute: typeof AuthenticatedLibraryRoute
   AuthenticatedPersonalityRoute: typeof AuthenticatedPersonalityRoute
@@ -417,6 +438,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAppRoute: AuthenticatedAppRoute,
+  AuthenticatedDayTurnoverRoute: AuthenticatedDayTurnoverRoute,
   AuthenticatedEventsRoute: AuthenticatedEventsRoute,
   AuthenticatedLibraryRoute: AuthenticatedLibraryRoute,
   AuthenticatedPersonalityRoute: AuthenticatedPersonalityRoute,
