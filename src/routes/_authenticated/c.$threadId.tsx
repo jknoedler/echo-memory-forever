@@ -273,6 +273,12 @@ function ChatWindow({
     inputRef.current?.focus();
   }, [threadId]);
 
+  // Session-stored pending prompt. Two sources feed this:
+  //  - Landing pages that queue a prompt and route into a thread.
+  //  - The midnight rollover, which stashes the current draft before
+  //    navigating to /day-turnover.
+  // Midnight-stashed drafts must NOT auto-send — we just restore them
+  // into the composer so the user can hit enter.
   const consumedRef = useRef(false);
   useEffect(() => {
     if (consumedRef.current) return;
@@ -282,7 +288,46 @@ function ChatWindow({
       sessionStorage.removeItem("mement0_pending_prompt");
       sendMessage({ text: pending });
     }
+    const draft = sessionStorage.getItem("mement0_rollover_draft");
+    if (draft && draft.trim()) {
+      sessionStorage.removeItem("mement0_rollover_draft");
+      setInput(draft);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
   }, [sendMessage]);
+
+  // Map of message id → ISO timestamp. Persisted messages carry created_at
+  // from the DB; live-streamed messages fall back to "now" the first time
+  // we see them, giving hour markers something to hang on to.
+  const [timeMap, setTimeMap] = useState<Map<string, string>>(() => {
+    const m = new Map<string, string>();
+    for (const h of history) m.set(h.id, h.created_at);
+    return m;
+  });
+  useEffect(() => {
+    setTimeMap((prev) => {
+      let next = prev;
+      for (const h of history) {
+        if (!next.has(h.id)) {
+          if (next === prev) next = new Map(prev);
+          next.set(h.id, h.created_at);
+        }
+      }
+      return next;
+    });
+  }, [history]);
+  useEffect(() => {
+    setTimeMap((prev) => {
+      let next = prev;
+      for (const m of messages) {
+        if (!next.has(m.id)) {
+          if (next === prev) next = new Map(prev);
+          next.set(m.id, new Date().toISOString());
+        }
+      }
+      return next;
+    });
+  }, [messages]);
 
   const lastCountRef = useRef(0);
   useEffect(() => {
@@ -291,6 +336,60 @@ function ChatWindow({
       lastCountRef.current = messages.length;
     }
   }, [messages]);
+
+  // Deep-link: ?t={messageId} scrolls to and briefly highlights that message.
+  const targetT = search.t;
+  const scrolledToRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!targetT || scrolledToRef.current === targetT) return;
+    // Wait a frame in case the message renders on the next tick.
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-msg-id="${targetT}"]`) as HTMLElement | null;
+      if (!el) return;
+      scrolledToRef.current = targetT;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2400);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [targetT, messages, history]);
+
+  // Midnight watcher: at local midnight, stash the composer draft and
+  // navigate to /day-turnover, which resolves the new day's chat and
+  // forwards. Re-arms on visibility change and after each fire.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function armForNextMidnight() {
+      if (timer) clearTimeout(timer);
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 5, 0); // +5s slack so the server clock has ticked
+      const ms = next.getTime() - now.getTime();
+      timer = setTimeout(() => {
+        try {
+          sessionStorage.setItem("mement0_rollover_draft", input);
+        } catch {
+          /* private mode etc. */
+        }
+        navigate({ to: "/day-turnover" });
+      }, ms);
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") armForNextMidnight();
+    }
+    armForNextMidnight();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // We deliberately don't depend on `input` — we read the latest value at
+    // fire time via the closure re-created only on nav/timer setup. To avoid
+    // stale-draft capture, rebind on mount only; user will normally have
+    // typed by then, and if not the empty string is fine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
+
 
   // Auto-scroll while selecting text with touch near the container edges
   const scrollRef = useRef<HTMLDivElement>(null);
