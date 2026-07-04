@@ -333,28 +333,46 @@ export const Route = createFileRoute("/api/chat")({
         const HOT_WINDOW_MS = 6 * 30 * 24 * 3600 * 1000; // ~6 months
         const hotCutoffIso = new Date(Date.now() - HOT_WINDOW_MS).toISOString();
 
-        // COLD — semantic across the entire archive (no time filter).
+        // COLD — semantic across the entire archive. Uses recall_archive so
+        // each hit carries the thread_id + message-level timestamp; the
+        // model can then quote and DEEP-LINK past moments back to the user
+        // via [<time>](/c/<threadId>?t=<memoryId>) instead of vaguely
+        // gesturing at "last week".
         let archiveBlock = "";
         if (userText) {
           const vec = await embedText(userText);
           if (vec) {
-            const { data: hits } = await supabase.rpc("match_memories", {
+            const { data: hits } = await (supabase as unknown as {
+              rpc: (name: string, args: Record<string, unknown>) => Promise<{
+                data:
+                  | Array<{
+                      memory_id: string;
+                      thread_id: string | null;
+                      role: string;
+                      content: string;
+                      created_at: string;
+                      similarity: number;
+                    }>
+                  | null;
+              }>;
+            }).rpc("recall_archive", {
               query_embedding: vec as unknown as string,
               match_count: 15,
             });
             if (hits && hits.length) {
               archiveBlock = hits
-                .map(
-                  (h: { content: string; source: string; created_at: string; similarity: number }) => {
-                    const age = Date.now() - new Date(h.created_at).getTime();
-                    const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
-                    return `- (${tier}/${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${stripFallbackBanner(h.content)}`;
-                  },
-                )
+                .map((h) => {
+                  const age = Date.now() - new Date(h.created_at).getTime();
+                  const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
+                  const when = new Date(h.created_at).toISOString().slice(0, 16).replace("T", " ");
+                  const link = h.thread_id ? ` link=/c/${h.thread_id}?t=${h.memory_id}` : "";
+                  return `- (${tier}/${h.role}, ${when}${link}) ${stripFallbackBanner(h.content)}`;
+                })
                 .join("\n");
             }
           }
         }
+
 
         // HOT — last 6 months, chronological, up to 60 entries. Runs even
         // when OPENAI_API_KEY is missing, so continuity survives an
