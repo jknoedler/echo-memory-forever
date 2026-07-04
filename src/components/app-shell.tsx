@@ -373,14 +373,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
             <button
               type="button"
-              onClick={() => createM.mutate()}
-              disabled={createM.isPending}
+              onClick={handlePlus}
+              disabled={createSubM.isPending || openTodayM.isPending}
               className="p-2 rounded-md bg-primary text-primary-foreground"
-              aria-label="New thread"
-              title="New thread"
+              aria-label={plusLabel}
+              title={plusLabel}
             >
               <Plus className="h-4 w-4" />
             </button>
+
           </aside>
         ) : (
           <aside className="flex md:w-72 flex-col border-r border-border bg-sidebar">
