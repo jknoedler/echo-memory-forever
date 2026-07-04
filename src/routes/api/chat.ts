@@ -722,7 +722,10 @@ export const Route = createFileRoute("/api/chat")({
             } catch {
               /* skip on resolve error */
             }
+          }
         }
+
+
 
         // 3. Emergency fallbacks — direct provider endpoints (OpenAI-compatible)
         //    for any project-level key that's present. These are the "last
