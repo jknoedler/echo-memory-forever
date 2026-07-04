@@ -154,14 +154,36 @@ export const Route = createFileRoute("/api/chat")({
         }
         const userId = claims.claims.sub as string;
 
-        const { data: thread, error: threadErr } = await supabase
+        const threadRes = await (supabase as unknown as {
+          from: (t: string) => {
+            select: (c: string) => {
+              eq: (col: string, v: unknown) => {
+                maybeSingle: () => Promise<{
+                  data:
+                    | {
+                        id: string;
+                        user_id: string;
+                        title: string;
+                        is_daily_root: boolean | null;
+                        carried_from_thread_id: string | null;
+                        day_key: string | null;
+                      }
+                    | null;
+                  error: { message: string } | null;
+                }>;
+              };
+            };
+          };
+        })
           .from("threads")
           .select("id, user_id, title, is_daily_root, carried_from_thread_id, day_key")
           .eq("id", threadId)
           .maybeSingle();
-        if (threadErr || !thread || thread.user_id !== userId) {
+        const thread = threadRes.data;
+        if (threadRes.error || !thread || thread.user_id !== userId) {
           return new Response("Thread not found", { status: 404 });
         }
+
 
 
         // Load settings
