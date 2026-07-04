@@ -101,7 +101,16 @@ function ChatPage() {
     );
   }
 
-  return <ChatWindow key={threadId} threadId={threadId} token={token} initialMessages={initial} />;
+  return (
+    <ChatWindow
+      key={threadId}
+      threadId={threadId}
+      token={token}
+      initialMessages={initial}
+      history={historyQ.data ?? []}
+    />
+  );
+
 }
 
 type AttachmentWithFile = Attachment & { file: File };
