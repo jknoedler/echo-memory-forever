@@ -117,5 +117,5 @@ export function resolveProvider(cfg: UserAiConfig, opts: ResolveOpts = {}): Reso
       "OpenRouter is not configured. Set OPENROUTER_API_KEY, or add your own key from the Library.",
     );
   }
-  return buildOpenRouter(key, cfg.model || undefined);
+  return buildOpenRouter(key, cfg.model || undefined, opts.bypassSanitize);
 }
