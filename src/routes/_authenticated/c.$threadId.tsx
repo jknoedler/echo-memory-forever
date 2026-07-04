@@ -1,8 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   SendHorizonal,
   Loader2,
@@ -27,9 +29,17 @@ import { startMicRecorder, type MicRecorder } from "@/lib/voice";
 import { extractYouTubeIds, type YouTubeIngest } from "@/lib/youtube";
 import { buildAudioViz } from "@/lib/audio-viz";
 
+const chatSearchSchema = z.object({
+  // Deep-link to a specific past moment (message id). Set by the AI when it
+  // recalls something and cites "Jump to this moment", or by manual links.
+  t: fallback(z.string().optional(), undefined).optional(),
+});
+
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
+  validateSearch: zodValidator(chatSearchSchema),
   component: ChatPage,
 });
+
 
 type DBMsg = { id: string; role: string; content: string; parts: unknown; created_at: string };
 
@@ -91,7 +101,16 @@ function ChatPage() {
     );
   }
 
-  return <ChatWindow key={threadId} threadId={threadId} token={token} initialMessages={initial} />;
+  return (
+    <ChatWindow
+      key={threadId}
+      threadId={threadId}
+      token={token}
+      initialMessages={initial}
+      history={historyQ.data ?? []}
+    />
+  );
+
 }
 
 type AttachmentWithFile = Attachment & { file: File };
@@ -100,11 +119,16 @@ function ChatWindow({
   threadId,
   token,
   initialMessages,
+  history,
 }: {
   threadId: string;
   token: string;
   initialMessages: UIMessage[];
+  history: DBMsg[];
 }) {
+  const navigate = useNavigate();
+  const search = Route.useSearch();
+
   const transport = useMemo(
     () => {
       // Snapshot the user's IANA timezone once per mount. The server uses it
@@ -226,6 +250,13 @@ function ChatWindow({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [advanced, setAdvanced] = useAdvanced();
+  // Ref mirror of the current draft so the midnight watcher captures the
+  // latest text at fire time instead of the empty mount-time snapshot.
+  const inputRef2 = useRef("");
+  useEffect(() => {
+    inputRef2.current = input;
+  }, [input]);
+
 
   // Voice mode (mic + TTS)
   const [voiceMode, setVoiceMode] = useState<boolean>(false);
@@ -249,6 +280,12 @@ function ChatWindow({
     inputRef.current?.focus();
   }, [threadId]);
 
+  // Session-stored pending prompt. Two sources feed this:
+  //  - Landing pages that queue a prompt and route into a thread.
+  //  - The midnight rollover, which stashes the current draft before
+  //    navigating to /day-turnover.
+  // Midnight-stashed drafts must NOT auto-send — we just restore them
+  // into the composer so the user can hit enter.
   const consumedRef = useRef(false);
   useEffect(() => {
     if (consumedRef.current) return;
@@ -258,7 +295,46 @@ function ChatWindow({
       sessionStorage.removeItem("mement0_pending_prompt");
       sendMessage({ text: pending });
     }
+    const draft = sessionStorage.getItem("mement0_rollover_draft");
+    if (draft && draft.trim()) {
+      sessionStorage.removeItem("mement0_rollover_draft");
+      setInput(draft);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
   }, [sendMessage]);
+
+  // Map of message id → ISO timestamp. Persisted messages carry created_at
+  // from the DB; live-streamed messages fall back to "now" the first time
+  // we see them, giving hour markers something to hang on to.
+  const [timeMap, setTimeMap] = useState<Map<string, string>>(() => {
+    const m = new Map<string, string>();
+    for (const h of history) m.set(h.id, h.created_at);
+    return m;
+  });
+  useEffect(() => {
+    setTimeMap((prev) => {
+      let next = prev;
+      for (const h of history) {
+        if (!next.has(h.id)) {
+          if (next === prev) next = new Map(prev);
+          next.set(h.id, h.created_at);
+        }
+      }
+      return next;
+    });
+  }, [history]);
+  useEffect(() => {
+    setTimeMap((prev) => {
+      let next = prev;
+      for (const m of messages) {
+        if (!next.has(m.id)) {
+          if (next === prev) next = new Map(prev);
+          next.set(m.id, new Date().toISOString());
+        }
+      }
+      return next;
+    });
+  }, [messages]);
 
   const lastCountRef = useRef(0);
   useEffect(() => {
@@ -267,6 +343,60 @@ function ChatWindow({
       lastCountRef.current = messages.length;
     }
   }, [messages]);
+
+  // Deep-link: ?t={messageId} scrolls to and briefly highlights that message.
+  const targetT = search.t;
+  const scrolledToRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!targetT || scrolledToRef.current === targetT) return;
+    // Wait a frame in case the message renders on the next tick.
+    const raf = requestAnimationFrame(() => {
+      const el = document.querySelector(`[data-msg-id="${targetT}"]`) as HTMLElement | null;
+      if (!el) return;
+      scrolledToRef.current = targetT;
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.classList.add("ring-2", "ring-primary");
+      setTimeout(() => el.classList.remove("ring-2", "ring-primary"), 2400);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [targetT, messages, history]);
+
+  // Midnight watcher: at local midnight, stash the composer draft and
+  // navigate to /day-turnover, which resolves the new day's chat and
+  // forwards. Re-arms on visibility change and after each fire.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function armForNextMidnight() {
+      if (timer) clearTimeout(timer);
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(24, 0, 5, 0); // +5s slack so the server clock has ticked
+      const ms = next.getTime() - now.getTime();
+      timer = setTimeout(() => {
+        try {
+          sessionStorage.setItem("mement0_rollover_draft", inputRef2.current);
+        } catch {
+          /* private mode etc. */
+        }
+        navigate({ to: "/day-turnover" });
+      }, ms);
+    }
+    function onVis() {
+      if (document.visibilityState === "visible") armForNextMidnight();
+    }
+    armForNextMidnight();
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      if (timer) clearTimeout(timer);
+      document.removeEventListener("visibilitychange", onVis);
+    };
+    // We deliberately don't depend on `input` — we read the latest value at
+    // fire time via the closure re-created only on nav/timer setup. To avoid
+    // stale-draft capture, rebind on mount only; user will normally have
+    // typed by then, and if not the empty string is fine.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigate]);
+
 
   // Auto-scroll while selecting text with touch near the container edges
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -668,9 +798,28 @@ function ChatWindow({
               <p className="text-sm">The archive listens.</p>
             </div>
           )}
-          {messages.map((m) => (
-            <MessageBubble key={m.id} msg={m} />
-          ))}
+          {(() => {
+            const out: React.ReactNode[] = [];
+            let lastHour: string | null = null;
+            for (const m of messages) {
+              const iso = timeMap.get(m.id);
+              if (iso) {
+                const d = new Date(iso);
+                const hourKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+                if (hourKey !== lastHour) {
+                  const label = d.toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    hour12: true,
+                  });
+                  out.push(<HourMarker key={`h-${hourKey}`} label={label} />);
+                  lastHour = hourKey;
+                }
+              }
+              out.push(<MessageBubble key={m.id} msg={m} />);
+            }
+            return out;
+          })()}
+
           {(status === "submitted" || hasInFlightJob) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
@@ -760,7 +909,11 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
     (p): p is { type: "file"; mediaType: string; url: string } => p.type === "file",
   );
   return (
-    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+    <div
+      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+      data-msg-id={msg.id}
+    >
+
       <div
         className={`max-w-[85%] rounded-2xl px-4 py-3 text-[15px] leading-relaxed whitespace-pre-wrap space-y-2 ${
           isUser
@@ -798,8 +951,67 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
             )}
           </div>
         )}
-        {text}
+        {isUser ? text : <RecallLinkified text={text} />}
       </div>
     </div>
   );
 }
+
+// Turns `[label](/c/UUID?t=UUID)` inside recall replies into an internal
+// TanStack Link that scrolls the destination thread to the cited message.
+const RECALL_LINK_RE = /\[([^\]]+)\]\((\/c\/([0-9a-f-]{36})\?t=([0-9a-f-]{36}))\)/g;
+function RecallLinkified({ text }: { text: string }) {
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  let m: RegExpExecArray | null;
+  RECALL_LINK_RE.lastIndex = 0;
+  while ((m = RECALL_LINK_RE.exec(text)) !== null) {
+    if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
+    const [, label, , threadId, memId] = m;
+    nodes.push(
+      <RecallLink key={`${threadId}-${memId}-${m.index}`} threadId={threadId} t={memId}>
+        {label}
+      </RecallLink>,
+    );
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  if (nodes.length === 0) return <>{text}</>;
+  return <>{nodes}</>;
+}
+
+function RecallLink({
+  threadId,
+  t,
+  children,
+}: {
+  threadId: string;
+  t: string;
+  children: React.ReactNode;
+}) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        navigate({ to: "/c/$threadId", params: { threadId }, search: { t } });
+      }}
+      className="underline decoration-primary/60 underline-offset-4 hover:decoration-primary text-primary"
+    >
+      {children}
+    </button>
+  );
+}
+
+
+function HourMarker({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/70 select-none">
+      <span className="h-px flex-1 bg-border" />
+      <span>{label}</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+

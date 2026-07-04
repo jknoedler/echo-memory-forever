@@ -1,63 +1,76 @@
-## Goal
+# Daily chats with sub-chats + hour markers + AI recall
 
-Sending a message must always finish, even if you close the tab, lose signal, or reload. When you're present, you still get the live streaming feel. When you're gone, a background worker completes the reply and it's waiting for you on reload.
+Replace the flat thread list with one chat per day. Sub-chats nest inside today when you want separation. Within each day, subtle hour markers divide the transcript so you can scroll to a specific time. At the user's local midnight the day rolls over: brief loading screen, fresh chat for the new day, last ~10 messages silently carried as context. And the AI itself can fetch any past moment on demand — you shouldn't ever *have* to scroll to find something.
 
-## What you'll see
+## How it works for the user
 
-- Send a message → assistant "thinking" bubble appears immediately.
-- Stay in the app → stream renders live, exactly like today.
-- Close the app mid-reply → server keeps working. When you reopen the thread, the finished reply is there.
-- Reload during a still-processing turn → thread shows the "thinking" bubble with a live status; message appears via realtime when done.
-- If the model errors, the turn is marked failed and shown as such (with retry).
+- **Opening the app** lands you in *today's chat*, always.
+- **"New" button** creates a *sub-chat inside today*. All of today's chats (root + sub-chats) group together in the sidebar.
+- **Sidebar** grouped by day: Today, Yesterday, then dated headers. Sub-chats indent under their day. Older days collapse under "Earlier".
+- **Hour markers** inside every chat: thin dividers appear inline in the transcript at each hour boundary — `— 2 PM —`, `— 3 PM —`. Empty hours are skipped. A tiny hour rail on the right edge lets you jump-scroll to any hour of the day.
+- **Midnight rollover**: mid-message when the clock rolls → short "New day…" loading screen (~1s) → new day's chat opens, draft text preserved and pasted into the composer.
+- **Context carry**: every new day-root silently inherits the last ~10 messages of the previous day's root as background context for the model. Not shown in the visible transcript.
+- **AI recall (this is the point)**: ask "what did I say about the espresso machine last Thursday?" and the model retrieves it directly from your archive and quotes it back. No manual searching required.
+- **Archived days** are read-only in the sidebar. Click "continue this thread" to reopen for writing.
 
-## How it works (technical)
+## Layout sketch
 
-### 1. New table: `chat_jobs`
+```text
+┌──────────────────────────────┐  ┌───────────────────────────┐
+│ + New sub-chat               │  │  Today · Wed Nov 12       │
+├──────────────────────────────┤  │ ─── 9 AM ─────────────    │
+│ TODAY                        │  │  you: morning notes…      │
+│ • Main                    ●  │  │  DED: got it              │
+│   ↳ Debugging build          │  │ ─── 11 AM ────────────    │
+│   ↳ Grocery list             │  │  you: quick q…            │
+│ YESTERDAY                    │  │ ─── 2 PM ─────────────    │
+│ • Main                       │  │  you: …                   │
+│ EARLIER                      │  │                       │9│ │
+│ ▸ Wed · Nov 12               │  │                       │11││
+│ ▸ Tue · Nov 11               │  │                       │2 ││
+└──────────────────────────────┘  └───────────────────────────┘
+```
 
-Columns: `id`, `user_id`, `thread_id`, `status` (`pending` | `processing` | `complete` | `failed`), `request_payload` (jsonb — the messages array + tz), `assistant_message_id` (nullable), `error` (text), `attempts` (int), `worker_lock` (uuid nullable), `locked_at`, `created_at`, `updated_at`, `started_at`, `finished_at`. RLS scoped to owner. Realtime enabled. Owner-read, service-role-write.
+## Technical plan
 
-### 2. Extract chat pipeline into a reusable function
+**Schema (migration)**
+- `threads` gains: `day_key date`, `parent_thread_id uuid null references threads(id)`, `is_daily_root bool default false`, `carried_from_thread_id uuid null`, `timezone text`.
+- Unique partial index: one daily root per `(user_id, day_key)` where `is_daily_root = true`.
+- Backfill: `day_key = created_at::date`, mark existing threads as daily roots.
+- Nightly cron: flip `continuity_status = 'archived'` on roots where `day_key < current_date` and status is `open`.
 
-Move the entire model-call pipeline currently inline in `POST /api/chat` (memory retrieval, personality block, biometrics, calendar, followups, model resolution, refusal/fallback logic, post-turn extraction) into `src/lib/chat-pipeline.server.ts` exposing `runChatTurn({ supabase, userId, threadId, messages, tz, onDelta? })`. Same function powers both the live route and the worker.
+**Server functions (`src/lib/threads.functions.ts`)**
+- `getOrCreateTodayThread({ tz })` — returns today's daily root, creates it if missing, sets `carried_from_thread_id` to yesterday's root.
+- `createSubThread({ parentId })` — creates a sub-chat under a day root; blocks if parent is archived.
+- `listThreadsGrouped()` — returns `[{ dayKey, root, subs[] }]` newest-first with a lazy "load older" cursor.
 
-### 3. `POST /api/chat` — hybrid path
+**AI recall (`src/lib/memories.functions.ts` + `src/routes/api/chat.ts`)**
+- Existing embeddings pipeline already indexes messages. Add a tool the model can call mid-turn: `recall_from_archive({ query, day_range?, thread_id? })` that runs a hybrid search (pgvector `match_memories` + a lexical `ILIKE` fallback) across the user's entire message history and returns the top hits with `thread_id`, `timestamp`, and quoted content.
+- Chat system prompt updated with a short instruction: "Before answering questions about the past, call `recall_from_archive` — do not guess. Quote the retrieved text with its date/time."
+- When the model quotes a recalled snippet, render an inline "Jump to this moment" link in the assistant bubble that deep-links to `/c/{threadId}?t={messageId}` and scrolls the transcript to that hour marker.
 
-- Insert a `chat_jobs` row with status `processing` and a per-request `worker_lock` UUID.
-- Run `runChatTurn` with an `onDelta` callback that streams to the response.
-- On success: write assistant message to `messages` table, mark job `complete`, clear lock.
-- If `request.signal` aborts (client disconnected) mid-stream: keep the model call running to completion using `ctx.waitUntil` (Cloudflare Workers), save the message, mark complete. If the runtime kills us before completion, the row stays `processing` with a stale `locked_at` — the worker reclaims it after 60s.
-- If the model call throws: mark `failed` with error message.
+**Chat pipeline (`src/routes/api/chat.ts`)**
+- When building context for a daily root, if `carried_from_thread_id` is set and this is the first user turn, prepend the last 10 messages from that prior root as system-tagged "prior day context" (not persisted).
+- Sub-chats do not carry context from siblings.
 
-### 4. `POST /api/public/hooks/process-chat-jobs` — worker
+**Frontend**
+- `/app` calls `getOrCreateTodayThread` with `Intl.DateTimeFormat().resolvedOptions().timeZone` and redirects to `/c/{todayId}`.
+- `/day-turnover` transient route: loading screen, awaits new day root, redirects. Draft passed via `sessionStorage`.
+- `app-shell.tsx` sidebar: grouped renderer; "New thread" → "New sub-chat" when inside a day.
+- `c.$threadId.tsx`:
+  - `?t={messageId}` search param scrolls to that message on mount and briefly highlights it.
+  - Hour-marker renderer: walk the sorted messages; when the local hour changes, emit a divider row before the next message. Hour rail on the right computes which hours have any messages and renders clickable ticks (`scrollIntoView` on the divider).
+  - Restore carried draft from `sessionStorage`.
+- `useDayRollover` hook: computes ms-until-local-midnight, on fire stashes the draft and navigates to `/day-turnover`. Re-arms on visibility change and after each rollover.
 
-- Authenticated by Supabase `apikey` header (anon key, per platform pattern).
-- Uses `supabaseAdmin` to atomically claim up to N pending/stale jobs (`UPDATE ... SET status='processing', worker_lock=gen_random_uuid(), locked_at=now() WHERE (status='pending') OR (status='processing' AND locked_at < now()-interval '60s') RETURNING *`).
-- For each claimed job: instantiate a user-scoped Supabase client using the service role but scoping all queries by `user_id`, run `runChatTurn`, save assistant message, mark complete. Errors → `failed` with error, `attempts++`; give up after 3.
-- Returns `{ processed, failed }`.
-
-### 5. pg_cron schedule
-
-Runs the worker every minute against the stable preview/production URL.
-
-### 6. Frontend changes
-
-- Thread route (`c.$threadId.tsx`): on mount, subscribe to two Supabase realtime channels for this thread: `messages` (INSERT) and `chat_jobs` (UPDATE). New assistant message → append to chat. Job `complete`/`failed` → hide thinking bubble / show error.
-- On reload with an in-flight job: query `chat_jobs` where thread_id=… and status in (pending, processing); if any, render the thinking bubble immediately with "Working on your last message…".
-- Send flow: keep AI SDK `useChat` streaming for the live-present case. The stream itself carries text as today; on stream close without content (disconnect), realtime picks it up.
-
-### 7. Cleanup
-
-Old completed jobs older than 7 days pruned by pg_cron nightly.
-
-## Files touched
-
-- New: `supabase/migrations/…_chat_jobs.sql`, `src/lib/chat-pipeline.server.ts`, `src/routes/api/public/hooks/process-chat-jobs.ts`
-- Edited: `src/routes/api/chat.ts` (thin wrapper around pipeline + job lifecycle), `src/routes/_authenticated/c.$threadId.tsx` (realtime subscriptions + in-flight indicator on load)
-- SQL insert (not migration): pg_cron schedule for the worker
+**Edge cases**
+- Tab open across midnight → watcher fires seamlessly.
+- Tab closed at 11pm, reopened 2am next day → `/app` creates today's root with carry.
+- Timezone travel → tz captured per-thread; each visit uses browser's current tz.
+- Sub-chat open at midnight → rolls over to new day's root.
+- Recall across archived + active threads works identically (same message table).
 
 ## Out of scope
-
-- Push notifications on completion (can add later).
-- Streaming resumption if you reconnect mid-generation — you'll see the final message appear at once via realtime, not resumed token-by-token. Adding true stream resume is a much bigger project.
-
-Approve and I'll build it.
+- Search across archived days as a manual UI (AI recall replaces it).
+- Renaming daily roots (auto-titled by date + optional summary).
+- Merging sub-chats.

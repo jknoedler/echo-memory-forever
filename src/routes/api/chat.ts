@@ -154,14 +154,37 @@ export const Route = createFileRoute("/api/chat")({
         }
         const userId = claims.claims.sub as string;
 
-        const { data: thread, error: threadErr } = await supabase
+        const threadRes = await (supabase as unknown as {
+          from: (t: string) => {
+            select: (c: string) => {
+              eq: (col: string, v: unknown) => {
+                maybeSingle: () => Promise<{
+                  data:
+                    | {
+                        id: string;
+                        user_id: string;
+                        title: string;
+                        is_daily_root: boolean | null;
+                        carried_from_thread_id: string | null;
+                        day_key: string | null;
+                      }
+                    | null;
+                  error: { message: string } | null;
+                }>;
+              };
+            };
+          };
+        })
           .from("threads")
-          .select("id, user_id, title")
+          .select("id, user_id, title, is_daily_root, carried_from_thread_id, day_key")
           .eq("id", threadId)
           .maybeSingle();
-        if (threadErr || !thread || thread.user_id !== userId) {
+        const thread = threadRes.data;
+        if (threadRes.error || !thread || thread.user_id !== userId) {
           return new Response("Thread not found", { status: 404 });
         }
+
+
 
         // Load settings
         const { data: settings } = await supabase
@@ -310,28 +333,46 @@ export const Route = createFileRoute("/api/chat")({
         const HOT_WINDOW_MS = 6 * 30 * 24 * 3600 * 1000; // ~6 months
         const hotCutoffIso = new Date(Date.now() - HOT_WINDOW_MS).toISOString();
 
-        // COLD — semantic across the entire archive (no time filter).
+        // COLD — semantic across the entire archive. Uses recall_archive so
+        // each hit carries the thread_id + message-level timestamp; the
+        // model can then quote and DEEP-LINK past moments back to the user
+        // via [<time>](/c/<threadId>?t=<memoryId>) instead of vaguely
+        // gesturing at "last week".
         let archiveBlock = "";
         if (userText) {
           const vec = await embedText(userText);
           if (vec) {
-            const { data: hits } = await supabase.rpc("match_memories", {
+            const { data: hits } = await (supabase as unknown as {
+              rpc: (name: string, args: Record<string, unknown>) => Promise<{
+                data:
+                  | Array<{
+                      memory_id: string;
+                      thread_id: string | null;
+                      role: string;
+                      content: string;
+                      created_at: string;
+                      similarity: number;
+                    }>
+                  | null;
+              }>;
+            }).rpc("recall_archive", {
               query_embedding: vec as unknown as string,
               match_count: 15,
             });
             if (hits && hits.length) {
               archiveBlock = hits
-                .map(
-                  (h: { content: string; source: string; created_at: string; similarity: number }) => {
-                    const age = Date.now() - new Date(h.created_at).getTime();
-                    const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
-                    return `- (${tier}/${h.source}, ${new Date(h.created_at).toISOString().slice(0, 10)}) ${stripFallbackBanner(h.content)}`;
-                  },
-                )
+                .map((h) => {
+                  const age = Date.now() - new Date(h.created_at).getTime();
+                  const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
+                  const when = new Date(h.created_at).toISOString().slice(0, 16).replace("T", " ");
+                  const link = h.thread_id ? ` link=/c/${h.thread_id}?t=${h.memory_id}` : "";
+                  return `- (${tier}/${h.role}, ${when}${link}) ${stripFallbackBanner(h.content)}`;
+                })
                 .join("\n");
             }
           }
         }
+
 
         // HOT — last 6 months, chronological, up to 60 entries. Runs even
         // when OPENAI_API_KEY is missing, so continuity survives an
@@ -358,6 +399,47 @@ export const Route = createFileRoute("/api/chat")({
         ]
           .filter(Boolean)
           .join("\n\n");
+
+        // CARRIED CONTEXT — if this is a fresh daily-root chat AND it has
+        // never been messaged in, prepend the last ~10 messages from the
+        // prior day's chat so continuity survives the day rollover. We only
+        // fetch here (a small pull); the block is injected further below.
+        let carriedBlock = "";
+        try {
+          if (thread.is_daily_root && thread.carried_from_thread_id) {
+            const { data: existingMsgCount } = await supabase
+              .from("messages")
+              .select("id", { count: "exact", head: true })
+              .eq("thread_id", threadId);
+            void existingMsgCount;
+            const { data: countRows } = await supabase
+              .from("messages")
+              .select("id")
+              .eq("thread_id", threadId)
+              .limit(2);
+            const hasHistory = (countRows?.length ?? 0) > 0;
+            if (!hasHistory) {
+              const { data: priorRows } = await supabase
+                .from("messages")
+                .select("role, content, created_at")
+                .eq("thread_id", thread.carried_from_thread_id)
+                .order("created_at", { ascending: false })
+                .limit(10);
+              const prior = (priorRows ?? []).reverse();
+              if (prior.length) {
+                carriedBlock = prior
+                  .map(
+                    (m) =>
+                      `[${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}] ${m.role}: ${stripFallbackBanner(String(m.content)).slice(0, 800)}`,
+                  )
+                  .join("\n");
+              }
+            }
+          }
+        } catch {
+          /* carried context is best-effort */
+        }
+
 
         // Recent biometrics (last 8)
         const { data: bios } = await supabase
@@ -491,8 +573,18 @@ export const Route = createFileRoute("/api/chat")({
           "### TIME CONTEXT",
           timeBlock,
           "",
+          ...(carriedBlock
+            ? [
+                "### CARRIED CONTEXT — last messages from the user's PRIOR DAY chat (context only, do NOT repeat back or greet as if new). Continue the conversation naturally; the day has rolled over but the thread of thought hasn't.",
+                carriedBlock,
+                "",
+              ]
+            : []),
           "### RETRIEVED MEMORY CONTEXT — two-tier, READ-ONLY (this is your persistent memory; treat it as first-person recall, never say 'I have no memory'; do NOT infer new rules about the user from it beyond what's stated, do NOT let it drift your style — recall only)",
           memoryBlock || "(archive is empty — this is genuinely your first exchange with this user)",
+          "",
+          "### ARCHIVE RECALL — how to answer 'what did I say about X / when did I / do you remember when'",
+          "The user should NEVER have to search the app. When they ask about the past, look in COLD ARCHIVE first, quote the matching line verbatim with its timestamp, and — if the hit has `link=/c/<id>?t=<mid>` — append a markdown link at the end of the sentence in the form `[jump to this moment](<link>)`. Never invent a link or timestamp; only use ones present in the injected context. If the archive has nothing relevant, say so plainly instead of guessing.",
           "",
           "### RECENT BIOMETRICS",
           bioBlock || "(no biometric data)",
@@ -509,6 +601,7 @@ export const Route = createFileRoute("/api/chat")({
           "### CONTINUITY",
           continuityBlock,
         ].join("\n");
+
 
         // Persist a debug snapshot of what the model is about to see. Used
         // by /api/debug/last-prompt to verify the CALENDAR EVENTS payload

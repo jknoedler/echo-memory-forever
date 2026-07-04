@@ -1,16 +1,22 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useMatchRoute, useNavigate, useRouter } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Brain, CalendarDays, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
+import { Brain, CalendarDays, ChevronDown, ChevronRight, ClipboardList, Library, LogOut, Plus, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Mement0Logo, Mement0Mark, Mement0Wordmark } from "@/components/mement0-logo";
 import { BrandClock } from "@/components/brand-clock";
 import { FEATURE_FLAGS } from "@/lib/feature-flags";
 import { supabase } from "@/integrations/supabase/client";
-import { createThread, deleteThread, listThreads } from "@/lib/threads.functions";
+import {
+  createSubThread,
+  deleteThread,
+  getOrCreateTodayThread,
+  listThreadsGrouped,
+} from "@/lib/threads.functions";
 
 const SIDEBAR_KEY = "mement0_sidebar_collapsed";
-const VISIBLE_THREADS = 10;
+const OLDER_OPEN_KEY = "mement0_older_open";
+
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -22,7 +28,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (typeof window === "undefined") return false;
     return window.localStorage.getItem(SIDEBAR_KEY) === "1";
   });
-  const [showAll, setShowAll] = useState(false);
+  const [olderOpen, setOlderOpen] = useState<boolean>(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(OLDER_OPEN_KEY) === "1";
+  });
+
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -69,17 +79,92 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mobileOpen]);
 
 
-  const threadsQ = useQuery({
-    queryKey: ["threads"],
-    queryFn: () => listThreads(),
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(OLDER_OPEN_KEY, olderOpen ? "1" : "0");
+    }
+  }, [olderOpen]);
+
+  const groupsQ = useQuery({
+    queryKey: ["threads-grouped"],
+    queryFn: () => listThreadsGrouped(),
   });
 
-  const createM = useMutation({
-    mutationFn: () => createThread({ data: {} }),
+  const activeThreadId = (matchRoute({ to: "/c/$threadId", fuzzy: true }) as
+    | { threadId?: string }
+    | false) && (matchRoute({ to: "/c/$threadId" }) as { threadId?: string } | false);
+  const activeId =
+    typeof activeThreadId === "object" && activeThreadId
+      ? activeThreadId.threadId
+      : undefined;
+
+  // The user's local calendar day, refreshed each render, used to label
+  // "Today" / "Yesterday" in the sidebar without depending on server state.
+  const localDay = useMemo(() => {
+    let tz = "UTC";
+    try {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+    } catch {}
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
+
+  const groups = (groupsQ.data ?? []) as Array<{
+    dayKey: string;
+    root: {
+      id: string;
+      title: string;
+      last_message_at: string;
+      continuity_status: string;
+    } | null;
+    subs: Array<{
+      id: string;
+      title: string;
+      last_message_at: string;
+      continuity_status: string;
+    }>;
+  }>;
+  const todayGroup = groups.find((g) => g.dayKey === localDay);
+  const todayRootId = todayGroup?.root?.id ?? null;
+
+  // Active day's root (root of the currently-open chat), used to decide
+  // whether the "+" creates a sub-chat or jumps to today.
+  const activeGroup = groups.find(
+    (g) => g.root?.id === activeId || g.subs.some((s) => s.id === activeId),
+  );
+  const activeDayRootId = activeGroup?.root?.id ?? null;
+  const inActiveDay = !!activeGroup;
+
+  const openTodayM = useMutation({
+    mutationFn: () => {
+      let tz = "UTC";
+      try {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+      } catch {}
+      return getOrCreateTodayThread({ data: { tz } });
+    },
     onSuccess: (t) => {
+      if (!t) return;
+      queryClient.invalidateQueries({ queryKey: ["threads-grouped"] });
       queryClient.invalidateQueries({ queryKey: ["threads"] });
       setMobileOpen(false);
-      navigate({ to: "/c/$threadId", params: { threadId: t!.id } });
+      navigate({ to: "/c/$threadId", params: { threadId: t.id } });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const createSubM = useMutation({
+    mutationFn: (parentId: string) => createSubThread({ data: { parentId } }),
+    onSuccess: (t) => {
+      if (!t) return;
+      queryClient.invalidateQueries({ queryKey: ["threads-grouped"] });
+      queryClient.invalidateQueries({ queryKey: ["threads"] });
+      setMobileOpen(false);
+      navigate({ to: "/c/$threadId", params: { threadId: t.id } });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
@@ -87,6 +172,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const deleteM = useMutation({
     mutationFn: (id: string) => deleteThread({ data: { id } }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threads-grouped"] });
       queryClient.invalidateQueries({ queryKey: ["threads"] });
       navigate({ to: "/app" });
     },
@@ -100,17 +186,50 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/" });
   }
 
-  const activeThreadId = (matchRoute({ to: "/c/$threadId", fuzzy: true }) as
-    | { threadId?: string }
-    | false) && (matchRoute({ to: "/c/$threadId" }) as { threadId?: string } | false);
-  const activeId =
-    typeof activeThreadId === "object" && activeThreadId
-      ? activeThreadId.threadId
-      : undefined;
+  // "+" button: create a sub-chat when the user is inside a day; otherwise
+  // open today's daily root.
+  function handlePlus() {
+    if (inActiveDay && activeDayRootId) {
+      createSubM.mutate(activeDayRootId);
+    } else if (todayRootId) {
+      createSubM.mutate(todayRootId);
+    } else {
+      openTodayM.mutate();
+    }
+  }
 
-  const allThreads = threadsQ.data ?? [];
-  const visibleThreads = showAll ? allThreads : allThreads.slice(0, VISIBLE_THREADS);
-  const hasMore = allThreads.length > VISIBLE_THREADS;
+  const plusLabel = inActiveDay ? "New sub-chat" : "Open today";
+
+  function formatDayLabel(dayKey: string): string {
+    if (dayKey === localDay) return "Today";
+    // Yesterday check: subtract one day from localDay
+    const [y, m, d] = localDay.split("-").map(Number);
+    const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
+    const yStr = yesterday.toISOString().slice(0, 10);
+    if (dayKey === yStr) return "Yesterday";
+    try {
+      const [yy, mm, dd] = dayKey.split("-").map(Number);
+      const dt = new Date(Date.UTC(yy, mm - 1, dd));
+      return new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }).format(dt);
+    } catch {
+      return dayKey;
+    }
+  }
+
+  const TODAY_YESTERDAY = new Set<string>();
+  TODAY_YESTERDAY.add(localDay);
+  {
+    const [y, m, d] = localDay.split("-").map(Number);
+    const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
+    TODAY_YESTERDAY.add(yesterday.toISOString().slice(0, 10));
+  }
+  const primaryGroups = groups.filter((g) => TODAY_YESTERDAY.has(g.dayKey));
+  const olderGroups = groups.filter((g) => !TODAY_YESTERDAY.has(g.dayKey));
+
 
   function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     return (
@@ -142,78 +261,77 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="p-3">
           <button
             type="button"
-            onClick={() => createM.mutate()}
-            disabled={createM.isPending}
+            onClick={handlePlus}
+            disabled={createSubM.isPending || openTodayM.isPending}
             className="w-full flex items-center justify-center gap-2 rounded-md bg-primary py-2.5 text-sm font-medium text-primary-foreground hover:opacity-90 transition-opacity ember-glow"
           >
-            <Plus className="h-4 w-4" /> New thread
+            <Plus className="h-4 w-4" /> {plusLabel}
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto px-2 pb-3">
           <p className="px-2 py-2 text-[10px] uppercase tracking-widest text-muted-foreground">
-            Archive {allThreads.length > 0 && <span className="text-muted-foreground/60">· {showAll ? allThreads.length : Math.min(VISIBLE_THREADS, allThreads.length)}{hasMore && !showAll ? ` / ${allThreads.length}` : ""}</span>}
+            Archive
           </p>
-          {threadsQ.isLoading ? (
+          {groupsQ.isLoading ? (
             <p className="px-3 py-2 text-xs text-muted-foreground">Loading…</p>
-          ) : allThreads.length === 0 ? (
-            <p className="px-3 py-2 text-xs text-muted-foreground">No threads yet.</p>
+          ) : groups.length === 0 ? (
+            <p className="px-3 py-2 text-xs text-muted-foreground">
+              No days yet. Start typing.
+            </p>
           ) : (
-            <>
-              <ul className="space-y-0.5">
-                {visibleThreads.map((t) => {
-                  const active = t.id === activeId;
-                  const idleHrs = (Date.now() - new Date(t.last_message_at).getTime()) / 3_600_000;
-                  const stale = t.continuity_status === "open" && idleHrs > 12;
-                  return (
-                    <li key={t.id} className="group flex items-center">
-                      <Link
-                        to="/c/$threadId"
-                        params={{ threadId: t.id }}
-                        onClick={onNavigate}
-                        className={`flex-1 min-w-0 rounded-md px-3 py-2 text-sm transition-colors ${
-                          active
-                            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                            : "text-sidebar-foreground hover:bg-sidebar-accent/60"
-                        }`}
-                        title={t.title}
-                      >
-                        <span className="flex items-center gap-2 min-w-0">
-                          {stale && (
-                            <span
-                              className="h-1.5 w-1.5 shrink-0 rounded-full bg-primary animate-pulse"
-                              title="Unresolved — check-in pending"
-                            />
-                          )}
-                          <span className="block truncate">{t.title}</span>
-                        </span>
-                      </Link>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (confirm("Delete this thread?")) deleteM.mutate(t.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-destructive transition-all"
-                        aria-label="Delete thread"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
-              {hasMore && (
-                <button
-                  type="button"
-                  onClick={() => setShowAll((v) => !v)}
-                  className="mt-2 w-full px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-sidebar-accent/40 transition-colors"
-                >
-                  {showAll ? "Show recent 10" : `Show all (${allThreads.length})`}
-                </button>
+            <div className="space-y-3">
+              {primaryGroups.map((g) => (
+                <DayBlock
+                  key={g.dayKey}
+                  label={formatDayLabel(g.dayKey)}
+                  group={g}
+                  activeId={activeId}
+                  onNavigate={onNavigate}
+                  onDelete={(id: string) => {
+                    if (confirm("Delete this chat?")) deleteM.mutate(id);
+                  }}
+
+                />
+              ))}
+              {olderGroups.length > 0 && (
+                <div>
+                  <button
+                    type="button"
+                    onClick={() => setOlderOpen((v) => !v)}
+                    className="w-full flex items-center gap-1 px-2 py-1.5 text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                  >
+                    {olderOpen ? (
+                      <ChevronDown className="h-3 w-3" />
+                    ) : (
+                      <ChevronRight className="h-3 w-3" />
+                    )}
+                    Earlier ({olderGroups.length})
+                  </button>
+                  {olderOpen && (
+                    <div className="mt-1 space-y-3">
+                      {olderGroups.map((g) => (
+                        <DayBlock
+                          key={g.dayKey}
+                          label={formatDayLabel(g.dayKey)}
+                          group={g}
+                          activeId={activeId}
+                          onNavigate={onNavigate}
+                          onDelete={(id: string) => {
+                            if (confirm("Delete this chat?")) deleteM.mutate(id);
+                          }}
+
+                          muted
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
-            </>
+            </div>
           )}
         </div>
+
 
         <div className="border-t border-border p-2 space-y-0.5">
           <NavItem to="/tasks" icon={<ClipboardList className="h-4 w-4" />} label="Staged tasks" onClick={onNavigate} />
@@ -257,14 +375,15 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
             <button
               type="button"
-              onClick={() => createM.mutate()}
-              disabled={createM.isPending}
+              onClick={handlePlus}
+              disabled={createSubM.isPending || openTodayM.isPending}
               className="p-2 rounded-md bg-primary text-primary-foreground"
-              aria-label="New thread"
-              title="New thread"
+              aria-label={plusLabel}
+              title={plusLabel}
             >
               <Plus className="h-4 w-4" />
             </button>
+
           </aside>
         ) : (
           <aside className="flex md:w-72 flex-col border-r border-border bg-sidebar">
@@ -338,11 +457,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <BrandClock className={FEATURE_FLAGS.showClock ? "" : "sr-only"} />
             <button
               type="button"
-              onClick={() => createM.mutate()}
+              onClick={handlePlus}
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
             >
-              New
+              {inActiveDay ? "+ Sub" : "Today"}
             </button>
+
           </div>
         </div>
         {children}
@@ -373,3 +493,122 @@ function NavItem({
     </Link>
   );
 }
+
+type DayGroup = {
+  dayKey: string;
+  root: {
+    id: string;
+    title: string;
+    last_message_at: string;
+    continuity_status: string;
+  } | null;
+  subs: Array<{
+    id: string;
+    title: string;
+    last_message_at: string;
+    continuity_status: string;
+  }>;
+};
+
+function DayBlock({
+  label,
+  group,
+  activeId,
+  onNavigate,
+  onDelete,
+  muted,
+}: {
+  label: string;
+  group: DayGroup;
+  activeId: string | undefined;
+  onNavigate?: () => void;
+  onDelete: (id: string) => void;
+  muted?: boolean;
+}) {
+  const root = group.root;
+  return (
+    <div>
+      <p
+        className={`px-2 pb-1 text-[10px] uppercase tracking-widest ${
+          muted ? "text-muted-foreground/60" : "text-primary/80"
+        }`}
+      >
+        {label}
+      </p>
+      <ul className="space-y-0.5">
+        {root && (
+          <ThreadRow
+            id={root.id}
+            title="Main"
+            active={root.id === activeId}
+            archived={root.continuity_status === "archived"}
+            onNavigate={onNavigate}
+            onDelete={onDelete}
+          />
+        )}
+        {group.subs.map((s) => (
+          <ThreadRow
+            key={s.id}
+            id={s.id}
+            title={s.title || "Sub-chat"}
+            active={s.id === activeId}
+            archived={s.continuity_status === "archived"}
+            onNavigate={onNavigate}
+            onDelete={onDelete}
+            indent
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ThreadRow({
+  id,
+  title,
+  active,
+  archived,
+  indent,
+  onNavigate,
+  onDelete,
+}: {
+  id: string;
+  title: string;
+  active: boolean;
+  archived: boolean;
+  indent?: boolean;
+  onNavigate?: () => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <li className="group flex items-center">
+      <Link
+        to="/c/$threadId"
+        params={{ threadId: id }}
+        onClick={onNavigate}
+        className={`flex-1 min-w-0 rounded-md ${indent ? "ml-4" : ""} px-3 py-1.5 text-sm transition-colors ${
+          active
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : archived
+              ? "text-muted-foreground hover:bg-sidebar-accent/40"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+        }`}
+        title={title}
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          {indent && <span className="text-muted-foreground/70">↳</span>}
+          <span className="block truncate">{title}</span>
+        </span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => onDelete(id)}
+        className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-destructive transition-all"
+        aria-label="Delete chat"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </li>
+  );
+}
+
