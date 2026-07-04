@@ -382,6 +382,47 @@ export const Route = createFileRoute("/api/chat")({
           .filter(Boolean)
           .join("\n\n");
 
+        // CARRIED CONTEXT — if this is a fresh daily-root chat AND it has
+        // never been messaged in, prepend the last ~10 messages from the
+        // prior day's chat so continuity survives the day rollover. We only
+        // fetch here (a small pull); the block is injected further below.
+        let carriedBlock = "";
+        try {
+          if (thread.is_daily_root && thread.carried_from_thread_id) {
+            const { data: existingMsgCount } = await supabase
+              .from("messages")
+              .select("id", { count: "exact", head: true })
+              .eq("thread_id", threadId);
+            void existingMsgCount;
+            const { data: countRows } = await supabase
+              .from("messages")
+              .select("id")
+              .eq("thread_id", threadId)
+              .limit(2);
+            const hasHistory = (countRows?.length ?? 0) > 0;
+            if (!hasHistory) {
+              const { data: priorRows } = await supabase
+                .from("messages")
+                .select("role, content, created_at")
+                .eq("thread_id", thread.carried_from_thread_id)
+                .order("created_at", { ascending: false })
+                .limit(10);
+              const prior = (priorRows ?? []).reverse();
+              if (prior.length) {
+                carriedBlock = prior
+                  .map(
+                    (m) =>
+                      `[${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}] ${m.role}: ${stripFallbackBanner(String(m.content)).slice(0, 800)}`,
+                  )
+                  .join("\n");
+              }
+            }
+          }
+        } catch {
+          /* carried context is best-effort */
+        }
+
+
         // Recent biometrics (last 8)
         const { data: bios } = await supabase
           .from("biometrics")
