@@ -9,6 +9,9 @@ import { CATALOG, findCatalog } from "@/lib/provider-catalog";
 import { listUserProviders, setActiveProvider, listEnvProviders } from "@/lib/providers.functions";
 import { getMySettings, updateMySettings } from "@/lib/settings.functions";
 import { OPENROUTER_FREE_MODELS, OPENROUTER_FREE_DEFAULT } from "@/lib/openrouter-free";
+import { PAID_OPENROUTER_MODELS, formatPrice } from "@/lib/paid-models";
+import { getMyAdminStatus } from "@/lib/admin.functions";
+import { TIER_ULTRA_CHEAP, TIER_CHEAP } from "@/lib/model-tiers";
 
 const ADV_KEY = "mement0_advanced";
 
