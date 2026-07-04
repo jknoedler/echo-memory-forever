@@ -1,36 +1,63 @@
-## Heads up on `VITE_` vars
+## Root cause
 
-`VITE_*` variables are **build-time**, not runtime secrets. Lovable Cloud's secret store (`add_secret`) injects env vars into **backend code only** (server functions, edge functions) — they never reach the browser bundle. So storing `VITE_API_BASE_URL` there does nothing for `import.meta.env`.
+vLLM crashed during startup. The real error in the log is:
 
-For a client-side base URL, two options:
+```
+File ".../flashinfer/jit/core.py", line 55, in check_cuda_arch
+    elif major == 7 and minor.isdigit():
+AttributeError: 'int' object has no attribute 'isdigit'
+```
 
-**Option A — Add to `.env` as a `VITE_` var (correct for this case)**
-The value (`https://api.moment0.com`) is a public URL, not a secret. I'll append it to `.env` so Vite inlines it into the build. `import.meta.env.VITE_API_BASE_URL` then works everywhere in the frontend.
+This is a known bug in FlashInfer's CUDA arch detection — it assumes `minor` is a string but on some driver/torch combos it's an int. vLLM tries to JIT-compile a FlashInfer sampling kernel at startup, hits this bug, the engine core dies, and the API server exits. That's why `ss -tlnp | grep :8000` returns nothing — nothing is listening because the process crashed.
 
-**Option B — Also store as backend secret**
-Only needed if server functions (`src/routes/api/chat.ts`, etc.) also need to call the same URL. Different variable name (no `VITE_` prefix), read via `process.env.API_BASE_URL` in handlers.
+The `tail: option used in invalid context -- 8` line is unrelated — it happened because you pasted `tail -80 ~/vllm.log ss -tlnp | grep ':8000'` as one line, so `tail` tried to read a file literally named `ss` and rejected `-tlnp`. Always run those as two separate commands.
 
-## Plan (assuming Option A + wire it in)
+## Fix
 
-1. **Add to `.env`**
-   Append `VITE_API_BASE_URL=https://api.moment0.com` (note: you wrote `moment0.com`, not `mement0.com` — confirm which is intended).
+Tell vLLM to skip the FlashInfer sampler so it never hits that JIT path. Run these one line at a time:
 
-2. **Type it**
-   Add to `src/vite-env.d.ts` (or create) so TS knows about `import.meta.env.VITE_API_BASE_URL`.
+```bash
+pkill -f "vllm serve" || true
+```
 
-3. **Create a small helper** `src/lib/api-base.ts`:
-   ```ts
-   export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "";
+```bash
+export VLLM_USE_FLASHINFER_SAMPLER=0
+```
+
+```bash
+nohup vllm serve Qwen/Qwen2.5-32B-Instruct-AWQ --host 0.0.0.0 --port 8000 --api-key "$VLLM_KEY" > ~/vllm.log 2>&1 &
+```
+
+Wait ~60 seconds for model download/load, then check — as two separate commands:
+
+```bash
+tail -80 ~/vllm.log
+```
+
+```bash
+ss -tlnp | grep ':8000'
+```
+
+Success looks like a log line `Uvicorn running on http://0.0.0.0:8000` and an `ss` row showing `LISTEN` on `0.0.0.0:8000`.
+
+## If it still crashes
+
+Fallback options, try in order:
+
+1. Force a non-FlashInfer attention backend as well:
+   ```bash
+   export VLLM_ATTENTION_BACKEND=XFORMERS
    ```
-   So we don't sprinkle `import.meta.env` reads across the codebase.
+   then re-run the `nohup vllm serve ...` line.
 
-4. **Update fetch call sites** — I need to know **which** code should use this base URL. The project currently calls its own internal routes (`/api/chat`, `/api/stt`, `/api/tts`, etc.) as relative paths. Blindly prefixing all `fetch()` calls with `https://api.moment0.com` will break the app.
+2. Uninstall FlashInfer entirely so vLLM falls back to the native sampler:
+   ```bash
+   pip uninstall -y flashinfer-python flashinfer
+   ```
+   then re-run the `nohup vllm serve ...` line.
 
-## Questions before I build
+3. If it still fails, paste the new `tail -80 ~/vllm.log`. A different traceback means a different root cause (GPU OOM for a 32B AWQ model, HF auth, disk space, etc.) and I'll take it from there.
 
-1. **Domain typo?** `moment0.com` vs `mement0.com` — which is correct?
-2. **What is `api.moment0.com` for?** Is it your Qwen inference server (the Vast.ai one from earlier), or a different backend entirely?
-3. **Which existing fetch calls should point at it?** Options:
-   - (a) Only new code I'm about to add — tell me what to build
-   - (b) Replace the internal `/api/chat` route so the browser calls `https://api.moment0.com/chat` directly instead of the TanStack server function
-   - (c) Just add the constant and leave call sites alone for now
+## Note on scope
+
+This is vLLM server troubleshooting on your remote box — nothing in this project's code needs to change. No files will be edited when we switch to build mode; the "plan" is just the shell steps above.
