@@ -47,15 +47,27 @@ export const updateMySettings = createServerFn({ method: "POST" })
   .inputValidator((d) => SettingsUpdate.parse(d))
   .handler(async ({ data, context }) => {
     const patch = { ...data };
-    // Any non-BYO built-in gets forced to openrouter — we ship only OR now.
+
+    // Admins can select any paid OpenRouter model without the free-tier
+    // sanitizer rewriting it back to a free id.
+    const { data: roleRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    const isAdmin = !!roleRow;
+
     if (
       patch.provider &&
       patch.provider !== "custom" &&
       patch.provider !== "openrouter"
     ) {
       patch.provider = "openrouter";
-      if (patch.model !== undefined) patch.model = sanitizeOpenRouterModel(patch.model);
-    } else if (patch.provider === "openrouter" && patch.model !== undefined) {
+      if (patch.model !== undefined && !isAdmin) {
+        patch.model = sanitizeOpenRouterModel(patch.model);
+      }
+    } else if (patch.provider === "openrouter" && patch.model !== undefined && !isAdmin) {
       patch.model = sanitizeOpenRouterModel(patch.model);
     }
     const { error } = await context.supabase
