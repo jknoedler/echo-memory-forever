@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { RotateCcw, Save, Trash2, X, Plus } from "lucide-react";
+import { RotateCcw, Save, Trash2, X, Plus, History, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPersonalityPortrait,
   updatePersonalityPortrait,
   resetPersonalityPortrait,
+  getPersonalityHistory,
+  rollbackPersonalityPortrait,
 } from "@/lib/personality.functions";
 
 export const Route = createFileRoute("/_authenticated/personality")({
