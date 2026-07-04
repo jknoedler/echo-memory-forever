@@ -229,11 +229,16 @@ export function ModelPicker() {
   const activeFreeModel = envOpenRouterActive
     ? OPENROUTER_FREE_MODELS.find((m) => m.id === (settingsQ.data?.model ?? OPENROUTER_FREE_DEFAULT))
     : null;
+  const activePaidModel = envOpenRouterActive
+    ? PAID_OPENROUTER_MODELS.find((m) => m.id === settingsQ.data?.model)
+    : null;
   const label = activeId
     ? `${activeCat?.name ?? "Custom"} · ${settingsQ.data?.model || activeProvider?.default_model || "—"}`
-    : activeFreeModel
-      ? `Free · ${activeFreeModel.label}`
-      : "Free · Llama 3.3 70B";
+    : activePaidModel
+      ? `Admin · ${activePaidModel.label}`
+      : activeFreeModel
+        ? `Free · ${activeFreeModel.label}`
+        : "Free · Llama 3.3 70B";
 
   const connectedByCat = new Map(
     (providersQ.data ?? []).map((p) => [p.catalog_id, p]),
