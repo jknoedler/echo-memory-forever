@@ -119,11 +119,16 @@ function ChatWindow({
   threadId,
   token,
   initialMessages,
+  history,
 }: {
   threadId: string;
   token: string;
   initialMessages: UIMessage[];
+  history: DBMsg[];
 }) {
+  const navigate = useNavigate();
+  const search = Route.useSearch();
+
   const transport = useMemo(
     () => {
       // Snapshot the user's IANA timezone once per mount. The server uses it
