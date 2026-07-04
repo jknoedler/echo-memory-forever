@@ -1,8 +1,10 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { zodValidator, fallback } from "@tanstack/zod-adapter";
+import { z } from "zod";
 import {
   SendHorizonal,
   Loader2,
@@ -27,9 +29,17 @@ import { startMicRecorder, type MicRecorder } from "@/lib/voice";
 import { extractYouTubeIds, type YouTubeIngest } from "@/lib/youtube";
 import { buildAudioViz } from "@/lib/audio-viz";
 
+const chatSearchSchema = z.object({
+  // Deep-link to a specific past moment (message id). Set by the AI when it
+  // recalls something and cites "Jump to this moment", or by manual links.
+  t: fallback(z.string().optional(), undefined).optional(),
+});
+
 export const Route = createFileRoute("/_authenticated/c/$threadId")({
+  validateSearch: zodValidator(chatSearchSchema),
   component: ChatPage,
 });
+
 
 type DBMsg = { id: string; role: string; content: string; parts: unknown; created_at: string };
 
