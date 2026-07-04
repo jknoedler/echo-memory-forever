@@ -640,7 +640,16 @@ export const Route = createFileRoute("/api/chat")({
 
         // Resolve primary provider
         type ChatModel = ReturnType<typeof resolveProvider>["model"];
-        type ModelCandidate = { model: ChatModel; label: string; modelId: string };
+        type ModelCandidate = {
+          model: ChatModel;
+          label: string;
+          modelId: string;
+          /** Optional paid tier — presence triggers per-user hourly rate limit check. */
+          tier?: "ultra_cheap" | "cheap";
+          tierLabel?: string;
+          hourlyLimit?: number;
+        };
+
         let primaryModel: ChatModel;
         let primaryLabel = "primary";
         let primaryModelId = "";
