@@ -701,36 +701,11 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        // 2. Every OTHER OpenRouter free model, in catalog order.
-        //    fallbackEnvKind is always "openrouter" today, but we gate on
-        //    the key being present so a missing OPENROUTER_API_KEY silently
-        //    drops the free-model chain instead of crashing.
-        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
-          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
-          for (const m of OPENROUTER_FREE_MODELS) {
-            if (m.id === primaryModelId) continue;
-            try {
-              const resolved = resolveProvider(
-                { ...cfg, provider: "openrouter", model: m.id },
-                { ...providerKeys, activeProvider: null },
-              );
-              addFallbackCandidate({
-                model: resolved.model,
-                label: resolved.providerName,
-                modelId: resolved.modelId,
-              });
-            } catch {
-              /* skip on resolve error */
-            }
-          }
-        }
-
-
-
-        // 3. Emergency fallbacks — direct provider endpoints (OpenAI-compatible)
-        //    for any project-level key that's present. These are the "last
-        //    resort" so if OpenRouter is 429ing across every free model, chat
-        //    still answers. Order: Groq (fastest) → Gemini → OpenAI → Venice.
+        // 2. Emergency direct-provider fallbacks FIRST — these are almost
+        //    always healthy (Groq/Gemini) and answer in <1s. If OpenRouter
+        //    is 429ing across its whole free tier (common), cycling through
+        //    ~10 free models before trying Groq wastes 20+ seconds and the
+        //    browser gives up. Order: Groq (fastest) → Gemini → OpenAI → Venice.
         type DirectFb = { envKey: string | undefined; label: string; baseURL: string; modelId: string };
         const directFallbacks: DirectFb[] = [
           { envKey: process.env.GROQ_API_KEY, label: "groq", baseURL: "https://api.groq.com/openai/v1", modelId: "llama-3.3-70b-versatile" },
@@ -753,6 +728,28 @@ export const Route = createFileRoute("/api/chat")({
             });
           } catch {
             /* skip */
+          }
+        }
+
+        // 3. THEN cycle every OTHER OpenRouter free model, in catalog order.
+        //    Runs only if all direct fallbacks also failed (unlikely).
+        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
+          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
+          for (const m of OPENROUTER_FREE_MODELS) {
+            if (m.id === primaryModelId) continue;
+            try {
+              const resolved = resolveProvider(
+                { ...cfg, provider: "openrouter", model: m.id },
+                { ...providerKeys, activeProvider: null },
+              );
+              addFallbackCandidate({
+                model: resolved.model,
+                label: resolved.providerName,
+                modelId: resolved.modelId,
+              });
+            } catch {
+              /* skip on resolve error */
+            }
           }
         }
 
