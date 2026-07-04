@@ -250,6 +250,13 @@ function ChatWindow({
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const [advanced, setAdvanced] = useAdvanced();
+  // Ref mirror of the current draft so the midnight watcher captures the
+  // latest text at fire time instead of the empty mount-time snapshot.
+  const inputRef2 = useRef("");
+  useEffect(() => {
+    inputRef2.current = input;
+  }, [input]);
+
 
   // Voice mode (mic + TTS)
   const [voiceMode, setVoiceMode] = useState<boolean>(false);
