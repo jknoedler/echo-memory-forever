@@ -156,12 +156,13 @@ export const Route = createFileRoute("/api/chat")({
 
         const { data: thread, error: threadErr } = await supabase
           .from("threads")
-          .select("id, user_id, title")
+          .select("id, user_id, title, is_daily_root, carried_from_thread_id, day_key")
           .eq("id", threadId)
           .maybeSingle();
         if (threadErr || !thread || thread.user_id !== userId) {
           return new Response("Thread not found", { status: 404 });
         }
+
 
         // Load settings
         const { data: settings } = await supabase
