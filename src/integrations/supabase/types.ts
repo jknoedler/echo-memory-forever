@@ -627,6 +627,27 @@ export type Database = {
           },
         ]
       }
+      user_model_usage: {
+        Row: {
+          count: number
+          hour_bucket: string
+          tier: string
+          user_id: string
+        }
+        Insert: {
+          count?: number
+          hour_bucket: string
+          tier: string
+          user_id: string
+        }
+        Update: {
+          count?: number
+          hour_bucket?: string
+          tier?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_providers: {
         Row: {
           api_key: string | null
@@ -674,6 +695,7 @@ export type Database = {
           fallback_provider_id: string | null
           fallback_provider_kind: string | null
           hotl_auto_execute: boolean
+          is_paid: boolean
           model: string
           provider: string
           system_prompt_override: string | null
@@ -690,6 +712,7 @@ export type Database = {
           fallback_provider_id?: string | null
           fallback_provider_kind?: string | null
           hotl_auto_execute?: boolean
+          is_paid?: boolean
           model?: string
           provider?: string
           system_prompt_override?: string | null
@@ -706,6 +729,7 @@ export type Database = {
           fallback_provider_id?: string | null
           fallback_provider_kind?: string | null
           hotl_auto_execute?: boolean
+          is_paid?: boolean
           model?: string
           provider?: string
           system_prompt_override?: string | null
@@ -735,6 +759,13 @@ export type Database = {
     }
     Functions: {
       archive_yesterdays_open_threads: { Args: never; Returns: undefined }
+      bump_model_usage: {
+        Args: { _limit: number; _tier: string }
+        Returns: {
+          allowed: boolean
+          current_count: number
+        }[]
+      }
       claim_chat_jobs: {
         Args: { _limit?: number }
         Returns: {
