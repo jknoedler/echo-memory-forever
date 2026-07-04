@@ -79,17 +79,92 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [mobileOpen]);
 
 
-  const threadsQ = useQuery({
-    queryKey: ["threads"],
-    queryFn: () => listThreads(),
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(OLDER_OPEN_KEY, olderOpen ? "1" : "0");
+    }
+  }, [olderOpen]);
+
+  const groupsQ = useQuery({
+    queryKey: ["threads-grouped"],
+    queryFn: () => listThreadsGrouped(),
   });
 
-  const createM = useMutation({
-    mutationFn: () => createThread({ data: {} }),
+  const activeThreadId = (matchRoute({ to: "/c/$threadId", fuzzy: true }) as
+    | { threadId?: string }
+    | false) && (matchRoute({ to: "/c/$threadId" }) as { threadId?: string } | false);
+  const activeId =
+    typeof activeThreadId === "object" && activeThreadId
+      ? activeThreadId.threadId
+      : undefined;
+
+  // The user's local calendar day, refreshed each render, used to label
+  // "Today" / "Yesterday" in the sidebar without depending on server state.
+  const localDay = useMemo(() => {
+    let tz = "UTC";
+    try {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+    } catch {}
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: tz,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }, []);
+
+  const groups = (groupsQ.data ?? []) as Array<{
+    dayKey: string;
+    root: {
+      id: string;
+      title: string;
+      last_message_at: string;
+      continuity_status: string;
+    } | null;
+    subs: Array<{
+      id: string;
+      title: string;
+      last_message_at: string;
+      continuity_status: string;
+    }>;
+  }>;
+  const todayGroup = groups.find((g) => g.dayKey === localDay);
+  const todayRootId = todayGroup?.root?.id ?? null;
+
+  // Active day's root (root of the currently-open chat), used to decide
+  // whether the "+" creates a sub-chat or jumps to today.
+  const activeGroup = groups.find(
+    (g) => g.root?.id === activeId || g.subs.some((s) => s.id === activeId),
+  );
+  const activeDayRootId = activeGroup?.root?.id ?? null;
+  const inActiveDay = !!activeGroup;
+
+  const openTodayM = useMutation({
+    mutationFn: () => {
+      let tz = "UTC";
+      try {
+        tz = Intl.DateTimeFormat().resolvedOptions().timeZone || tz;
+      } catch {}
+      return getOrCreateTodayThread({ data: { tz } });
+    },
     onSuccess: (t) => {
+      if (!t) return;
+      queryClient.invalidateQueries({ queryKey: ["threads-grouped"] });
       queryClient.invalidateQueries({ queryKey: ["threads"] });
       setMobileOpen(false);
-      navigate({ to: "/c/$threadId", params: { threadId: t!.id } });
+      navigate({ to: "/c/$threadId", params: { threadId: t.id } });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const createSubM = useMutation({
+    mutationFn: (parentId: string) => createSubThread({ data: { parentId } }),
+    onSuccess: (t) => {
+      if (!t) return;
+      queryClient.invalidateQueries({ queryKey: ["threads-grouped"] });
+      queryClient.invalidateQueries({ queryKey: ["threads"] });
+      setMobileOpen(false);
+      navigate({ to: "/c/$threadId", params: { threadId: t.id } });
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
@@ -97,6 +172,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const deleteM = useMutation({
     mutationFn: (id: string) => deleteThread({ data: { id } }),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["threads-grouped"] });
       queryClient.invalidateQueries({ queryKey: ["threads"] });
       navigate({ to: "/app" });
     },
@@ -110,17 +186,50 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/" });
   }
 
-  const activeThreadId = (matchRoute({ to: "/c/$threadId", fuzzy: true }) as
-    | { threadId?: string }
-    | false) && (matchRoute({ to: "/c/$threadId" }) as { threadId?: string } | false);
-  const activeId =
-    typeof activeThreadId === "object" && activeThreadId
-      ? activeThreadId.threadId
-      : undefined;
+  // "+" button: create a sub-chat when the user is inside a day; otherwise
+  // open today's daily root.
+  function handlePlus() {
+    if (inActiveDay && activeDayRootId) {
+      createSubM.mutate(activeDayRootId);
+    } else if (todayRootId) {
+      createSubM.mutate(todayRootId);
+    } else {
+      openTodayM.mutate();
+    }
+  }
 
-  const allThreads = threadsQ.data ?? [];
-  const visibleThreads = showAll ? allThreads : allThreads.slice(0, VISIBLE_THREADS);
-  const hasMore = allThreads.length > VISIBLE_THREADS;
+  const plusLabel = inActiveDay ? "New sub-chat" : "Open today";
+
+  function formatDayLabel(dayKey: string): string {
+    if (dayKey === localDay) return "Today";
+    // Yesterday check: subtract one day from localDay
+    const [y, m, d] = localDay.split("-").map(Number);
+    const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
+    const yStr = yesterday.toISOString().slice(0, 10);
+    if (dayKey === yStr) return "Yesterday";
+    try {
+      const [yy, mm, dd] = dayKey.split("-").map(Number);
+      const dt = new Date(Date.UTC(yy, mm - 1, dd));
+      return new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      }).format(dt);
+    } catch {
+      return dayKey;
+    }
+  }
+
+  const TODAY_YESTERDAY = new Set<string>();
+  TODAY_YESTERDAY.add(localDay);
+  {
+    const [y, m, d] = localDay.split("-").map(Number);
+    const yesterday = new Date(Date.UTC(y, m - 1, d - 1));
+    TODAY_YESTERDAY.add(yesterday.toISOString().slice(0, 10));
+  }
+  const primaryGroups = groups.filter((g) => TODAY_YESTERDAY.has(g.dayKey));
+  const olderGroups = groups.filter((g) => !TODAY_YESTERDAY.has(g.dayKey));
+
 
   function SidebarBody({ onNavigate }: { onNavigate?: () => void }) {
     return (
