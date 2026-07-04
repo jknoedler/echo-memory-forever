@@ -455,11 +455,12 @@ export function AppShell({ children }: { children: ReactNode }) {
             <BrandClock className={FEATURE_FLAGS.showClock ? "" : "sr-only"} />
             <button
               type="button"
-              onClick={() => createM.mutate()}
+              onClick={handlePlus}
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
             >
-              New
+              {inActiveDay ? "+ Sub" : "Today"}
             </button>
+
           </div>
         </div>
         {children}
