@@ -942,7 +942,7 @@ export const Route = createFileRoute("/api/chat")({
             let primaryText = "";
             let primaryFailed = false;
             if (!preempt) {
-              const r = await runModel(primaryCandidate, system);
+              const r = await runModel(primaryCandidate, system, { maxRetries: 2 });
               primaryText = r.text;
               primaryFailed = r.failed;
               if (!primaryFailed && primaryText) {
