@@ -347,6 +347,48 @@ export type Database = {
         }
         Relationships: []
       }
+      personality_portrait_history: {
+        Row: {
+          change_source: string
+          communication: string
+          energy: string
+          explicit_preferences: string[]
+          freeform_notes: string
+          id: string
+          interests_ideas: string
+          mood: string
+          snapshot_at: string
+          user_id: string
+          values_worldview: string
+        }
+        Insert: {
+          change_source?: string
+          communication?: string
+          energy?: string
+          explicit_preferences?: string[]
+          freeform_notes?: string
+          id?: string
+          interests_ideas?: string
+          mood?: string
+          snapshot_at?: string
+          user_id: string
+          values_worldview?: string
+        }
+        Update: {
+          change_source?: string
+          communication?: string
+          energy?: string
+          explicit_preferences?: string[]
+          freeform_notes?: string
+          id?: string
+          interests_ideas?: string
+          mood?: string
+          snapshot_at?: string
+          user_id?: string
+          values_worldview?: string
+        }
+        Relationships: []
+      }
       personality_rules: {
         Row: {
           created_at: string

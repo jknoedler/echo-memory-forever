@@ -1,12 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { RotateCcw, Save, Trash2, X, Plus } from "lucide-react";
+import { RotateCcw, Save, Trash2, X, Plus, History, Undo2 } from "lucide-react";
 import { toast } from "sonner";
 import {
   getPersonalityPortrait,
   updatePersonalityPortrait,
   resetPersonalityPortrait,
+  getPersonalityHistory,
+  rollbackPersonalityPortrait,
 } from "@/lib/personality.functions";
 
 export const Route = createFileRoute("/_authenticated/personality")({
@@ -274,6 +276,9 @@ function PersonalityPage() {
           </button>
         </div>
 
+        <HistorySection />
+
+
         {style && style.sample_count > 0 && (
           <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="text-sm font-display font-semibold uppercase tracking-widest text-muted-foreground">
@@ -349,3 +354,127 @@ function Stat({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function HistorySection() {
+  const qc = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const h = useQuery({
+    queryKey: ["personality-history"],
+    queryFn: () => getPersonalityHistory(),
+    enabled: open,
+  });
+  const rollbackM = useMutation({
+    mutationFn: (id: string) => rollbackPersonalityPortrait({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Rolled back to that version");
+      qc.invalidateQueries({ queryKey: ["personality"] });
+      qc.invalidateQueries({ queryKey: ["personality-history"] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Rollback failed"),
+  });
+
+  const rows = h.data?.history ?? [];
+
+  return (
+    <section className="space-y-3">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-2 text-sm font-display font-semibold uppercase tracking-widest text-muted-foreground hover:text-foreground"
+      >
+        <History className="h-4 w-4" />
+        Version history {open ? "▾" : "▸"}
+      </button>
+      {open && (
+        <>
+          <p className="text-xs text-muted-foreground max-w-xl">
+            Every time your portrait changes — from synthesis, manual edits, or a
+            reset — the previous version is saved here. Last 50 kept.
+          </p>
+          {h.isLoading ? (
+            <p className="text-xs text-muted-foreground">Loading…</p>
+          ) : rows.length === 0 ? (
+            <p className="rounded-md border border-dashed border-border bg-card px-4 py-6 text-center text-xs text-muted-foreground">
+              No previous versions yet.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {rows.map((r) => {
+                const isOpen = expandedId === r.id;
+                return (
+                  <li key={r.id} className="rounded-md border border-border bg-card">
+                    <div className="flex items-center gap-2 p-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-mono">
+                          {new Date(r.snapshot_at).toLocaleString()}
+                        </p>
+                        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                          {r.change_source.replace("_", " ")}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setExpandedId(isOpen ? null : r.id)}
+                        className="rounded-md border border-border bg-background px-2 py-1 text-xs hover:bg-secondary"
+                      >
+                        {isOpen ? "Hide" : "View"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (confirm("Roll back to this version? Your current portrait will be saved to history first.")) {
+                            rollbackM.mutate(r.id);
+                          }
+                        }}
+                        disabled={rollbackM.isPending}
+                        className="inline-flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs text-primary-foreground hover:opacity-90 disabled:opacity-40"
+                      >
+                        <Undo2 className="h-3 w-3" />
+                        Restore
+                      </button>
+                    </div>
+                    {isOpen && (
+                      <div className="border-t border-border p-3 space-y-2 text-xs">
+                        <Snippet label="Energy" value={r.energy} />
+                        <Snippet label="Mood" value={r.mood} />
+                        <Snippet label="Values / worldview" value={r.values_worldview} />
+                        <Snippet label="Interests / ideas" value={r.interests_ideas} />
+                        <Snippet label="How they want to be met" value={r.communication} />
+                        <Snippet label="Notes" value={r.freeform_notes} />
+                        <div>
+                          <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                            Explicit preferences
+                          </p>
+                          {r.explicit_preferences.length ? (
+                            <ul className="mt-1 list-disc pl-4">
+                              {r.explicit_preferences.map((p, i) => (
+                                <li key={i}>{p}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <p className="mt-1 text-muted-foreground">—</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+function Snippet({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
+      <p className="mt-0.5 whitespace-pre-wrap">{value || "—"}</p>
+    </div>
+  );
+}
+
