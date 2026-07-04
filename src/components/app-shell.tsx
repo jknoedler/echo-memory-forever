@@ -288,9 +288,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                   group={g}
                   activeId={activeId}
                   onNavigate={onNavigate}
-                  onDelete={(id) => {
+                  onDelete={(id: string) => {
                     if (confirm("Delete this chat?")) deleteM.mutate(id);
                   }}
+
                 />
               ))}
               {olderGroups.length > 0 && (
