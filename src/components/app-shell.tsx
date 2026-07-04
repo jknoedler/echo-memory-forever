@@ -493,3 +493,122 @@ function NavItem({
     </Link>
   );
 }
+
+type DayGroup = {
+  dayKey: string;
+  root: {
+    id: string;
+    title: string;
+    last_message_at: string;
+    continuity_status: string;
+  } | null;
+  subs: Array<{
+    id: string;
+    title: string;
+    last_message_at: string;
+    continuity_status: string;
+  }>;
+};
+
+function DayBlock({
+  label,
+  group,
+  activeId,
+  onNavigate,
+  onDelete,
+  muted,
+}: {
+  label: string;
+  group: DayGroup;
+  activeId: string | undefined;
+  onNavigate?: () => void;
+  onDelete: (id: string) => void;
+  muted?: boolean;
+}) {
+  const root = group.root;
+  return (
+    <div>
+      <p
+        className={`px-2 pb-1 text-[10px] uppercase tracking-widest ${
+          muted ? "text-muted-foreground/60" : "text-primary/80"
+        }`}
+      >
+        {label}
+      </p>
+      <ul className="space-y-0.5">
+        {root && (
+          <ThreadRow
+            id={root.id}
+            title="Main"
+            active={root.id === activeId}
+            archived={root.continuity_status === "archived"}
+            onNavigate={onNavigate}
+            onDelete={onDelete}
+          />
+        )}
+        {group.subs.map((s) => (
+          <ThreadRow
+            key={s.id}
+            id={s.id}
+            title={s.title || "Sub-chat"}
+            active={s.id === activeId}
+            archived={s.continuity_status === "archived"}
+            onNavigate={onNavigate}
+            onDelete={onDelete}
+            indent
+          />
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function ThreadRow({
+  id,
+  title,
+  active,
+  archived,
+  indent,
+  onNavigate,
+  onDelete,
+}: {
+  id: string;
+  title: string;
+  active: boolean;
+  archived: boolean;
+  indent?: boolean;
+  onNavigate?: () => void;
+  onDelete: (id: string) => void;
+}) {
+  return (
+    <li className="group flex items-center">
+      <Link
+        to="/c/$threadId"
+        params={{ threadId: id }}
+        onClick={onNavigate}
+        className={`flex-1 min-w-0 rounded-md ${indent ? "ml-4" : ""} px-3 py-1.5 text-sm transition-colors ${
+          active
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : archived
+              ? "text-muted-foreground hover:bg-sidebar-accent/40"
+              : "text-sidebar-foreground hover:bg-sidebar-accent/60"
+        }`}
+        title={title}
+      >
+        <span className="flex items-center gap-2 min-w-0">
+          {indent && <span className="text-muted-foreground/70">↳</span>}
+          <span className="block truncate">{title}</span>
+        </span>
+      </Link>
+      <button
+        type="button"
+        onClick={() => onDelete(id)}
+        className="opacity-0 group-hover:opacity-100 p-2 text-muted-foreground hover:text-destructive transition-all"
+        aria-label="Delete chat"
+      >
+        <Trash2 className="h-3.5 w-3.5" />
+      </button>
+    </li>
+  );
+}
+
