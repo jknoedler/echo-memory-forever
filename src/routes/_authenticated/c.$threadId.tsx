@@ -799,7 +799,7 @@ function ChatWindow({
             </div>
           )}
           {(() => {
-            const out: JSX.Element[] = [];
+            const out: React.ReactNode[] = [];
             let lastHour: string | null = null;
             for (const m of messages) {
               const iso = timeMap.get(m.id);
