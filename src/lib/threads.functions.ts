@@ -157,20 +157,8 @@ export const createSubThread = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => SubInput.parse(d))
   .handler(async ({ data, context }) => {
-    const sb = context.supabase as unknown as {
-      from: (t: string) => {
-        select: (c: string) => {
-          eq: (col: string, v: unknown) => {
-            maybeSingle: () => Promise<{ data: GroupedRow | null; error: { message: string } | null }>;
-          };
-        };
-        insert: (row: Record<string, unknown>) => {
-          select: (c: string) => {
-            single: () => Promise<{ data: GroupedRow | null; error: { message: string } | null }>;
-          };
-        };
-      };
-    };
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+
 
     const parent = await sb
       .from("threads")
