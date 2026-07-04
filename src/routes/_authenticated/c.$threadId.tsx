@@ -14,6 +14,8 @@ import {
   MicOff,
   Volume2,
   VolumeX,
+  Copy,
+  Check,
 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
