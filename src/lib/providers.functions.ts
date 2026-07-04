@@ -79,6 +79,16 @@ export const setActiveProvider = createServerFn({ method: "POST" })
     }).parse(d),
   )
   .handler(async ({ data, context }) => {
+    // Admins can pin any paid OpenRouter model as the primary; sanitizer
+    // would otherwise rewrite it back to a free id.
+    const { data: adminRow } = await context.supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
+    const isAdmin = !!adminRow;
+
     let providerName: string;
     if (data.provider_id !== null) {
       providerName = "custom";
@@ -96,7 +106,9 @@ export const setActiveProvider = createServerFn({ method: "POST" })
     };
     if (data.model) {
       update.model =
-        providerName === "openrouter" ? sanitizeOpenRouterModel(data.model) : data.model;
+        providerName === "openrouter" && !isAdmin
+          ? sanitizeOpenRouterModel(data.model)
+          : data.model;
     }
     const { error } = await context.supabase
       .from("user_settings")
