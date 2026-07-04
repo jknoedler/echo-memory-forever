@@ -566,36 +566,66 @@ export type Database = {
       }
       threads: {
         Row: {
+          carried_from_thread_id: string | null
           continuity_note: string | null
           continuity_status: string
           created_at: string
+          day_key: string | null
           id: string
+          is_daily_root: boolean
           last_message_at: string
+          parent_thread_id: string | null
+          timezone: string | null
           title: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          carried_from_thread_id?: string | null
           continuity_note?: string | null
           continuity_status?: string
           created_at?: string
+          day_key?: string | null
           id?: string
+          is_daily_root?: boolean
           last_message_at?: string
+          parent_thread_id?: string | null
+          timezone?: string | null
           title?: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          carried_from_thread_id?: string | null
           continuity_note?: string | null
           continuity_status?: string
           created_at?: string
+          day_key?: string | null
           id?: string
+          is_daily_root?: boolean
           last_message_at?: string
+          parent_thread_id?: string | null
+          timezone?: string | null
           title?: string
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "threads_carried_from_thread_id_fkey"
+            columns: ["carried_from_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "threads_parent_thread_id_fkey"
+            columns: ["parent_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_providers: {
         Row: {
@@ -704,6 +734,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_yesterdays_open_threads: { Args: never; Returns: undefined }
       claim_chat_jobs: {
         Args: { _limit?: number }
         Returns: {
@@ -740,6 +771,22 @@ export type Database = {
           metadata: Json
           similarity: number
           source: string
+        }[]
+      }
+      recall_archive: {
+        Args: {
+          after_ts?: string
+          before_ts?: string
+          match_count?: number
+          query_embedding: string
+        }
+        Returns: {
+          content: string
+          created_at: string
+          memory_id: string
+          role: string
+          similarity: number
+          thread_id: string
         }[]
       }
     }
