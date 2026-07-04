@@ -982,6 +982,73 @@ function RecallLinkified({ text }: { text: string }) {
   return <>{nodes}</>;
 }
 
+// Splits assistant text on fenced ```code``` blocks and renders each block as
+// its own box with a copy button. Prose segments still get recall-link parsing.
+const FENCE_RE = /```([\w+-]*)\n?([\s\S]*?)```/g;
+function AssistantContent({ text }: { text: string }) {
+  const segments: React.ReactNode[] = [];
+  let cursor = 0;
+  let m: RegExpExecArray | null;
+  FENCE_RE.lastIndex = 0;
+  let i = 0;
+  while ((m = FENCE_RE.exec(text)) !== null) {
+    if (m.index > cursor) {
+      segments.push(
+        <RecallLinkified key={`p-${i}`} text={text.slice(cursor, m.index)} />,
+      );
+    }
+    segments.push(
+      <CodeBlock key={`c-${i}`} lang={m[1] || ""} code={m[2].replace(/\n$/, "")} />,
+    );
+    cursor = m.index + m[0].length;
+    i++;
+  }
+  if (cursor < text.length) {
+    segments.push(<RecallLinkified key={`p-${i}`} text={text.slice(cursor)} />);
+  }
+  if (segments.length === 0) return <>{text}</>;
+  return <>{segments}</>;
+}
+
+function CodeBlock({ lang, code }: { lang: string; code: string }) {
+  const [copied, setCopied] = useState(false);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error("Copy failed");
+    }
+  }
+  return (
+    <div className="my-2 overflow-hidden rounded-lg border border-border bg-background/60">
+      <div className="flex items-center justify-between border-b border-border/60 px-3 py-1.5 text-[11px] uppercase tracking-wider text-muted-foreground">
+        <span>{lang || "code"}</span>
+        <button
+          type="button"
+          onClick={copy}
+          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] normal-case tracking-normal hover:bg-muted hover:text-foreground transition-colors"
+          aria-label="Copy code"
+        >
+          {copied ? (
+            <>
+              <Check className="h-3 w-3" /> Copied
+            </>
+          ) : (
+            <>
+              <Copy className="h-3 w-3" /> Copy
+            </>
+          )}
+        </button>
+      </div>
+      <pre className="overflow-x-auto p-3 text-[13px] leading-relaxed whitespace-pre font-mono text-foreground">
+        <code>{code}</code>
+      </pre>
+    </div>
+  );
+}
+
 function RecallLink({
   threadId,
   t,
