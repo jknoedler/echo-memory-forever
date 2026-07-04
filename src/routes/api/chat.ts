@@ -664,7 +664,7 @@ export const Route = createFileRoute("/api/chat")({
         let primaryLabel = "primary";
         let primaryModelId = "";
         try {
-          const resolved = resolveProvider(cfg, { ...providerKeys, activeProvider });
+          const resolved = resolveProvider(cfg, { ...providerKeys, activeProvider, bypassSanitize: isAdmin });
           primaryModel = resolved.model;
           primaryLabel = resolved.providerName;
           primaryModelId = resolved.modelId;
