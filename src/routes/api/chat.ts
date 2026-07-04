@@ -1088,16 +1088,39 @@ export const Route = createFileRoute("/api/chat")({
             }
 
             // Fallback path. Try every configured candidate until one produces text.
+            // Paid tiers (candidate.tier set) go through a per-user hourly
+            // rate limit before we spend on them.
+            const { bumpModelUsage } = await import("@/lib/rate-limit.server");
             let fbText = "";
             let usedFallbackLabel: string | null = null;
+            let usedFallbackTier: string | null = null;
             for (const candidate of fallbackCandidates) {
+              if (candidate.tier && candidate.hourlyLimit) {
+                const check = await bumpModelUsage(
+                  supabase,
+                  candidate.tier,
+                  candidate.hourlyLimit,
+                );
+                if (!check.allowed) {
+                  console.warn(
+                    `[chat] user ${userId} over hourly cap for ${candidate.tier} (${check.currentCount}/${candidate.hourlyLimit}) — skipping ${candidate.modelId}`,
+                  );
+                  continue;
+                }
+              }
               const fb = await runModel(candidate, system + FALLBACK_SYSTEM_SUFFIX);
               if (!fb.failed && fb.text) {
                 fbText = fb.text;
                 usedFallbackLabel = candidate.label;
+                usedFallbackTier = candidate.tierLabel ?? null;
+                console.log(
+                  `[chat] fallback served by ${candidate.label}/${candidate.modelId}${candidate.tierLabel ? ` (${candidate.tierLabel})` : ""}`,
+                );
                 break;
               }
             }
+            void usedFallbackTier;
+
             if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
               const mid = crypto.randomUUID();
