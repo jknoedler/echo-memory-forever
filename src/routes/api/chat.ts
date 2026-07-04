@@ -197,6 +197,16 @@ export const Route = createFileRoute("/api/chat")({
           .maybeSingle();
         const isPaidUser = (settings as { is_paid?: boolean } | null)?.is_paid ?? false;
 
+        // Admin check — admins bypass the free-tier sanitizer, ignore all
+        // rate limits, and can select any paid OpenRouter model as primary.
+        const { data: adminRow } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", userId)
+          .eq("role", "admin")
+          .maybeSingle();
+        const isAdmin = !!adminRow;
+
 
         const cfg = {
           provider: settings?.provider ?? "lovable",
