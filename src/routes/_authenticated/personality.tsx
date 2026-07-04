@@ -276,6 +276,9 @@ function PersonalityPage() {
           </button>
         </div>
 
+        <HistorySection />
+
+
         {style && style.sample_count > 0 && (
           <section className="rounded-xl border border-border bg-card p-5">
             <h2 className="text-sm font-display font-semibold uppercase tracking-widest text-muted-foreground">
