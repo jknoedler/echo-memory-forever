@@ -798,9 +798,28 @@ function ChatWindow({
               <p className="text-sm">The archive listens.</p>
             </div>
           )}
-          {messages.map((m) => (
-            <MessageBubble key={m.id} msg={m} />
-          ))}
+          {(() => {
+            const out: JSX.Element[] = [];
+            let lastHour: string | null = null;
+            for (const m of messages) {
+              const iso = timeMap.get(m.id);
+              if (iso) {
+                const d = new Date(iso);
+                const hourKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}`;
+                if (hourKey !== lastHour) {
+                  const label = d.toLocaleTimeString(undefined, {
+                    hour: "numeric",
+                    hour12: true,
+                  });
+                  out.push(<HourMarker key={`h-${hourKey}`} label={label} />);
+                  lastHour = hourKey;
+                }
+              }
+              out.push(<MessageBubble key={m.id} msg={m} />);
+            }
+            return out;
+          })()}
+
           {(status === "submitted" || hasInFlightJob) && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
