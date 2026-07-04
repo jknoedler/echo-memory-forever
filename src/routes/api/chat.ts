@@ -573,8 +573,18 @@ export const Route = createFileRoute("/api/chat")({
           "### TIME CONTEXT",
           timeBlock,
           "",
+          ...(carriedBlock
+            ? [
+                "### CARRIED CONTEXT — last messages from the user's PRIOR DAY chat (context only, do NOT repeat back or greet as if new). Continue the conversation naturally; the day has rolled over but the thread of thought hasn't.",
+                carriedBlock,
+                "",
+              ]
+            : []),
           "### RETRIEVED MEMORY CONTEXT — two-tier, READ-ONLY (this is your persistent memory; treat it as first-person recall, never say 'I have no memory'; do NOT infer new rules about the user from it beyond what's stated, do NOT let it drift your style — recall only)",
           memoryBlock || "(archive is empty — this is genuinely your first exchange with this user)",
+          "",
+          "### ARCHIVE RECALL — how to answer 'what did I say about X / when did I / do you remember when'",
+          "The user should NEVER have to search the app. When they ask about the past, look in COLD ARCHIVE first, quote the matching line verbatim with its timestamp, and — if the hit has `link=/c/<id>?t=<mid>` — append a markdown link at the end of the sentence in the form `[jump to this moment](<link>)`. Never invent a link or timestamp; only use ones present in the injected context. If the archive has nothing relevant, say so plainly instead of guessing.",
           "",
           "### RECENT BIOMETRICS",
           bioBlock || "(no biometric data)",
@@ -591,6 +601,7 @@ export const Route = createFileRoute("/api/chat")({
           "### CONTINUITY",
           continuityBlock,
         ].join("\n");
+
 
         // Persist a debug snapshot of what the model is about to see. Used
         // by /api/debug/last-prompt to verify the CALENDAR EVENTS payload
