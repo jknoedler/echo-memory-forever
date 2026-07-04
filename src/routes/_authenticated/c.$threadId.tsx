@@ -951,11 +951,59 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
             )}
           </div>
         )}
-        {text}
+        {isUser ? text : <RecallLinkified text={text} />}
       </div>
     </div>
   );
 }
+
+// Turns `[label](/c/UUID?t=UUID)` inside recall replies into an internal
+// TanStack Link that scrolls the destination thread to the cited message.
+const RECALL_LINK_RE = /\[([^\]]+)\]\((\/c\/([0-9a-f-]{36})\?t=([0-9a-f-]{36}))\)/g;
+function RecallLinkified({ text }: { text: string }) {
+  const nodes: React.ReactNode[] = [];
+  let cursor = 0;
+  let m: RegExpExecArray | null;
+  RECALL_LINK_RE.lastIndex = 0;
+  while ((m = RECALL_LINK_RE.exec(text)) !== null) {
+    if (m.index > cursor) nodes.push(text.slice(cursor, m.index));
+    const [, label, , threadId, memId] = m;
+    nodes.push(
+      <RecallLink key={`${threadId}-${memId}-${m.index}`} threadId={threadId} t={memId}>
+        {label}
+      </RecallLink>,
+    );
+    cursor = m.index + m[0].length;
+  }
+  if (cursor < text.length) nodes.push(text.slice(cursor));
+  if (nodes.length === 0) return <>{text}</>;
+  return <>{nodes}</>;
+}
+
+function RecallLink({
+  threadId,
+  t,
+  children,
+}: {
+  threadId: string;
+  t: string;
+  children: React.ReactNode;
+}) {
+  const navigate = useNavigate();
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.preventDefault();
+        navigate({ to: "/c/$threadId", params: { threadId }, search: { t } });
+      }}
+      className="underline decoration-primary/60 underline-offset-4 hover:decoration-primary text-primary"
+    >
+      {children}
+    </button>
+  );
+}
+
 
 function HourMarker({ label }: { label: string }) {
   return (
