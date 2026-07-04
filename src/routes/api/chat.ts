@@ -1105,7 +1105,7 @@ export const Route = createFileRoute("/api/chat")({
             let usedFallbackLabel: string | null = null;
             let usedFallbackTier: string | null = null;
             for (const candidate of fallbackCandidates) {
-              if (candidate.tier && candidate.hourlyLimit) {
+              if (candidate.tier && candidate.hourlyLimit && !isAdmin) {
                 const check = await bumpModelUsage(
                   supabase,
                   candidate.tier,
