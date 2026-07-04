@@ -191,10 +191,12 @@ export const Route = createFileRoute("/api/chat")({
         const { data: settings } = await supabase
           .from("user_settings")
           .select(
-            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id, fallback_provider_kind",
+            "provider, model, custom_base_url, custom_api_key, custom_model_id, system_prompt_override, active_provider_id, fallback_provider_id, fallback_provider_kind, is_paid",
           )
           .eq("user_id", userId)
           .maybeSingle();
+        const isPaidUser = (settings as { is_paid?: boolean } | null)?.is_paid ?? false;
+
 
         const cfg = {
           provider: settings?.provider ?? "lovable",
