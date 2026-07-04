@@ -228,22 +228,8 @@ export const createThread = createServerFn({ method: "POST" })
     const tz = data.tz || "UTC";
     // Route through the same code path so a "create new thread" click
     // becomes a get-or-create of today's daily root.
-    const sb = context.supabase as unknown as {
-      from: (t: string) => {
-        select: (c: string) => {
-          eq: (col: string, v: unknown) => {
-            eq: (col: string, v: unknown) => {
-              maybeSingle: () => Promise<{ data: GroupedRow | null; error: { message: string } | null }>;
-            };
-          };
-        };
-        insert: (row: Record<string, unknown>) => {
-          select: (c: string) => {
-            single: () => Promise<{ data: GroupedRow | null; error: { message: string } | null }>;
-          };
-        };
-      };
-    };
+    const sb = context.supabase as unknown as { from: (t: string) => any };
+
     const dayKey = localDayKey(new Date(), tz);
     const existing = await sb
       .from("threads")
