@@ -197,6 +197,8 @@ export function ModelPicker() {
   const settingsQ = useQuery({ queryKey: ["settings"], queryFn: () => getMySettings() });
   const providersQ = useQuery({ queryKey: ["user_providers"], queryFn: () => listUserProviders() });
   const envQ = useQuery({ queryKey: ["env_providers"], queryFn: () => listEnvProviders() });
+  const adminQ = useQuery({ queryKey: ["admin_status"], queryFn: () => getMyAdminStatus() });
+  const isAdmin = adminQ.data?.isAdmin ?? false;
 
   const activateM = useMutation({
     mutationFn: (v: {
