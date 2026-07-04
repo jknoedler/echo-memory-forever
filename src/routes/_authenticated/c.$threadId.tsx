@@ -956,3 +956,14 @@ function MessageBubble({ msg }: { msg: UIMessage }) {
     </div>
   );
 }
+
+function HourMarker({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-3 text-[10px] uppercase tracking-widest text-muted-foreground/70 select-none">
+      <span className="h-px flex-1 bg-border" />
+      <span>{label}</span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
