@@ -1055,8 +1055,8 @@ export const Route = createFileRoute("/api/chat")({
             if (!preempt) {
               const r = await runModel(primaryCandidate, recoverySystem, {
                 maxRetries: 2,
-                bufferUntilComplete: true,
-                suppressRefusal: true,
+                bufferUntilComplete: inRefusalRecovery,
+                suppressRefusal: inRefusalRecovery,
               });
               primaryText = r.text;
               primaryFailed = r.failed;
