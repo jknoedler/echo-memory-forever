@@ -1005,15 +1005,14 @@ export const Route = createFileRoute("/api/chat")({
             };
             let primaryText = "";
             let primaryFailed = false;
+            let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
               const r = await runModel(primaryCandidate, system, { maxRetries: 2 });
               primaryText = r.text;
               primaryFailed = r.failed;
+              primaryErrorClass = r.errorClass;
               if (!primaryFailed && primaryText) {
                 await persistAssistant(primaryText, { tier: "primary" });
-                // Fire-and-forget: label the turn + stage a follow-up
-                // if the exchange described a future outcome worth
-                // checking on. Uses the same primary model.
                 extractAndSaveTurn({
                   supabase,
                   userId,
