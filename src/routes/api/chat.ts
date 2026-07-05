@@ -740,27 +740,14 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        // 2. Cycle every OTHER OpenRouter free model FIRST. User directive:
-        //    always exhaust every free option before spending a cent.
-        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
-          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
-          for (const m of OPENROUTER_FREE_MODELS) {
-            if (m.id === primaryModelId) continue;
-            try {
-              const resolved = resolveProvider(
-                { ...cfg, provider: "openrouter", model: m.id },
-                { ...providerKeys, activeProvider: null },
-              );
-              addFallbackCandidate({
-                model: resolved.model,
-                label: resolved.providerName,
-                modelId: resolved.modelId,
-              });
-            } catch {
-              /* skip on resolve error */
-            }
-          }
-        }
+        // 2. (removed) We used to cycle every OTHER OpenRouter free model
+        //    here. Users complained that picking a specific model then having
+        //    the app silently swap to a different one on rate-limit felt
+        //    broken. Free-model hopping is intentionally NOT part of the
+        //    fallback chain anymore — a rate-limited primary stays put and
+        //    surfaces its rate limit (see runModel + sticky-rate-limit logic
+        //    below). 402 / 5xx / bad-key failures still cascade to the paid
+        //    safety net in step 3.
 
         // 3. Paid OpenRouter tiers — ONLY after every free model has failed.
         //    T1 ultra-cheap (everyone, ≤ $0.15/M output, 20/hr cap).
