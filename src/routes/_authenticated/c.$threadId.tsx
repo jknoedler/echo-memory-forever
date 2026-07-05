@@ -156,10 +156,18 @@ function ChatWindow({
   );
 
 
-  const { messages, sendMessage, status, error, setMessages } = useChat({
+  const { messages, sendMessage, status, error, setMessages, clearError } = useChat({
     id: threadId,
     messages: initialMessages,
     transport,
+    onError: (e) => {
+      const msg = e instanceof Error ? e.message : "Reply failed";
+      if (/load failed|failed to fetch|network/i.test(msg)) {
+        toast.error("Connection dropped. I’ll finish it in the background.");
+      } else {
+        toast.error(msg);
+      }
+    },
   });
 
   // In-flight chat_jobs (rescue path). On mount, look for any pending or
@@ -182,6 +190,14 @@ function ChatWindow({
       cancelled = true;
     };
   }, [threadId]);
+
+  useEffect(() => {
+    if (!error) return;
+    if (/load failed|failed to fetch|network/i.test(error.message || "")) {
+      setHasInFlightJob(true);
+      clearError();
+    }
+  }, [error, clearError]);
 
   // Realtime: new assistant messages (from the rescue worker after a
   // disconnect) and chat_jobs status transitions for this thread.
