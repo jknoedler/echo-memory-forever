@@ -1044,7 +1044,6 @@ export const Route = createFileRoute("/api/chat")({
                   if (opts.suppressRefusal && looksLikeRefusal(text)) {
                     return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
                   }
-                  emitText(text);
                 } else if (holdingOpening) {
                   emitText(text);
                 }
@@ -1075,19 +1074,24 @@ export const Route = createFileRoute("/api/chat")({
               label: primaryLabel,
               modelId: primaryModelId,
             };
+            // If a fallback exists, never stream the primary directly. Buffer it,
+            // classify it, then emit exactly one visible assistant message. This
+            // prevents refusal text from flashing before fallback and avoids the
+            // client receiving multiple terminal `finish` events in one request.
+            const primaryBuffered = fallbackCandidates.length > 0 || inRefusalRecovery;
             let primaryText = "";
             let primaryFailed = false;
             let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
               const r = await runModel(primaryCandidate, recoverySystem, {
                 maxRetries: 2,
-                bufferUntilComplete: inRefusalRecovery,
-                suppressRefusal: inRefusalRecovery,
+                bufferUntilComplete: primaryBuffered,
+                suppressRefusal: primaryBuffered,
               });
               primaryText = r.text;
               primaryFailed = r.failed;
               primaryErrorClass = r.errorClass;
-              if (!primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
+              if (!primaryBuffered && !primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
                 await persistAssistant(primaryText, { tier: "primary" });
                 extractAndSaveTurn({
                   supabase,
@@ -1107,7 +1111,7 @@ export const Route = createFileRoute("/api/chat")({
             // second visible assistant turn.
             let validatorStatus: string = "skipped";
             let didCalendarRetry = false;
-            if (!preempt && !primaryFailed && primaryText) {
+            if (!preempt && !primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
               const v = validateCalendarCitation({
                 eventsBlock,
                 userText,
@@ -1118,8 +1122,11 @@ export const Route = createFileRoute("/api/chat")({
                 console.warn(
                   `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
                 );
-                const retry = await runModel(primaryCandidate, recoverySystem + STRICT_DATE_RETRY_SUFFIX);
-                if (!retry.failed && retry.text) {
+                const retry = await runModel(primaryCandidate, recoverySystem + STRICT_DATE_RETRY_SUFFIX, {
+                  bufferUntilComplete: primaryBuffered,
+                  suppressRefusal: primaryBuffered,
+                });
+                if (!retry.failed && retry.text && !looksLikeRefusal(retry.text)) {
                   didCalendarRetry = true;
                   const recheck = validateCalendarCitation({
                     eventsBlock,
@@ -1129,10 +1136,14 @@ export const Route = createFileRoute("/api/chat")({
                   validatorStatus = recheck.ok
                     ? `retry-ok:${recheck.reason}`
                     : `retry-fail:${recheck.reason}`;
-                  await persistAssistant(retry.text, {
-                    tier: "primary",
-                    calendar_retry: true,
-                  });
+                  if (primaryBuffered) {
+                    primaryText = retry.text;
+                  } else {
+                    await persistAssistant(retry.text, {
+                      tier: "primary",
+                      calendar_retry: true,
+                    });
+                  }
                 }
               }
             }
@@ -1169,6 +1180,21 @@ export const Route = createFileRoute("/api/chat")({
               // the AI SDK's red error rendering.
               if (primaryFailed && fallbackCandidates.length === 0) {
                 emitText("The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.");
+              }
+              if (!primaryFailed && primaryBuffered && primaryText) {
+                emitText(primaryText);
+                await persistAssistant(primaryText, {
+                  tier: "primary",
+                  ...(didCalendarRetry ? { calendar_retry: true } : {}),
+                });
+                extractAndSaveTurn({
+                  supabase,
+                  userId,
+                  threadId: threadId!,
+                  userText,
+                  assistantText: primaryText,
+                  model: primaryModel,
+                }).catch(() => {});
               }
               try {
                 const { summarizeThreadTitle } = await import(
@@ -1231,6 +1257,8 @@ export const Route = createFileRoute("/api/chat")({
                 : "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
               emitText(delta);
               fbText = delta;
+            } else {
+              emitText(fbText);
             }
 
             // Persist fallback text quietly; fallback metadata/server logs carry
