@@ -14,8 +14,8 @@ export const getRouter = () => {
     // Custom pending/loading screen — pure black + MementØ mark + "DØ MØRE".
     // Prevents any third-party framework loading state from flashing.
     defaultPendingComponent: AppLoading,
-    defaultPendingMs: 0,
-    defaultPendingMinMs: 0,
+    defaultPendingMs: 300,
+    defaultPendingMinMs: 200,
   });
 
   return router;
