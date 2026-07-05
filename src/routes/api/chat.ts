@@ -30,7 +30,13 @@ import {
   maybeSynthesizePortrait,
   updateStyleFingerprint,
 } from "@/lib/personality.server";
-import { FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
+import {
+  FALLBACK_SYSTEM_SUFFIX,
+  REFUSAL_RECOVERY_SUFFIX,
+  fallbackRefusalPivotReply,
+  looksLikeRefusal,
+  shouldPreemptToFallback,
+} from "@/lib/refusal";
 import {
   STRICT_DATE_RETRY_SUFFIX,
   summarizeEventsBlock,
@@ -129,6 +135,13 @@ function stripFallbackBanner(text: string): string {
 function sanitizeMessageForModel(msg: UIMessage): UIMessage {
   const parts = (msg as { parts?: UIMessage["parts"] }).parts;
   if (!Array.isArray(parts)) return msg;
+  const text = extractUserText(msg);
+  if (msg.role === "assistant" && looksLikeRefusal(text)) {
+    return {
+      ...msg,
+      parts: [{ type: "text", text: "[assistant refusal boilerplate omitted; continue with a useful reframing instead.]" }],
+    };
+  }
   return {
     ...msg,
     parts: parts.map((part) =>
