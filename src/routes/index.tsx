@@ -33,13 +33,21 @@ function Landing() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setAuthed(!!data.session);
+      if (data.session) {
+        navigate({ to: "/app", replace: true });
+        return;
+      }
+      setAuthed(false);
     });
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => {
-      setAuthed(!!s);
+      if (s) {
+        navigate({ to: "/app", replace: true });
+      } else {
+        setAuthed(false);
+      }
     });
     return () => sub.subscription.unsubscribe();
-  }, []);
+  }, [navigate]);
 
   useEffect(() => {
     inputRef.current?.focus();
