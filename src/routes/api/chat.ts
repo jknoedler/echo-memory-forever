@@ -43,15 +43,33 @@ import {
 } from "@/lib/followups.server";
 import type { Database } from "@/integrations/supabase/types";
 
-// Detect upstream 402 (credits exhausted) / 429 (rate-limited) failures so
-// we can route straight to the configured fallback (Venice by default)
-// instead of surfacing the gateway error to the user.
-function isCreditsOrRateLimitError(e: unknown): boolean {
+// Classify upstream errors. We split "just rate-limited" from "credits/broken"
+// because the user wants a rate-limited primary to STAY on that primary
+// (surface the rate limit; don't hop to a random other free model), while
+// 402 / 5xx / bad-key failures should fall through to the paid safety net.
+export function classifyModelError(e: unknown): "rate_limited" | "credits_or_broken" | "other" {
   const anyE = e as { statusCode?: number; status?: number; message?: string; cause?: { statusCode?: number } } | null;
   const code = anyE?.statusCode ?? anyE?.status ?? anyE?.cause?.statusCode;
-  if (code === 402 || code === 429) return true;
   const msg = (anyE?.message ?? "").toLowerCase();
-  return /\b(402|429)\b/.test(msg) || msg.includes("insufficient_quota") || msg.includes("rate limit") || msg.includes("credits");
+  if (code === 429 || /\b429\b/.test(msg) || msg.includes("rate limit") || msg.includes("rate-limit")) {
+    return "rate_limited";
+  }
+  if (
+    code === 402 ||
+    (typeof code === "number" && code >= 500) ||
+    /\b(402|5\d\d)\b/.test(msg) ||
+    msg.includes("insufficient_quota") ||
+    msg.includes("credits") ||
+    msg.includes("unauthorized") ||
+    msg.includes("invalid api key")
+  ) {
+    return "credits_or_broken";
+  }
+  return "other";
+}
+function isCreditsOrRateLimitError(e: unknown): boolean {
+  const c = classifyModelError(e);
+  return c === "rate_limited" || c === "credits_or_broken";
 }
 
 function isNewKey(v: string) {
@@ -722,27 +740,14 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
-        // 2. Cycle every OTHER OpenRouter free model FIRST. User directive:
-        //    always exhaust every free option before spending a cent.
-        if (fallbackEnvKind === "openrouter" && FB_ENV.openrouter) {
-          const { OPENROUTER_FREE_MODELS } = await import("@/lib/openrouter-free");
-          for (const m of OPENROUTER_FREE_MODELS) {
-            if (m.id === primaryModelId) continue;
-            try {
-              const resolved = resolveProvider(
-                { ...cfg, provider: "openrouter", model: m.id },
-                { ...providerKeys, activeProvider: null },
-              );
-              addFallbackCandidate({
-                model: resolved.model,
-                label: resolved.providerName,
-                modelId: resolved.modelId,
-              });
-            } catch {
-              /* skip on resolve error */
-            }
-          }
-        }
+        // 2. (removed) We used to cycle every OTHER OpenRouter free model
+        //    here. Users complained that picking a specific model then having
+        //    the app silently swap to a different one on rate-limit felt
+        //    broken. Free-model hopping is intentionally NOT part of the
+        //    fallback chain anymore — a rate-limited primary stays put and
+        //    surfaces its rate limit (see runModel + sticky-rate-limit logic
+        //    below). 402 / 5xx / bad-key failures still cascade to the paid
+        //    safety net in step 3.
 
         // 3. Paid OpenRouter tiers — ONLY after every free model has failed.
         //    T1 ultra-cheap (everyone, ≤ $0.15/M output, 20/hr cap).
@@ -936,7 +941,12 @@ export const Route = createFileRoute("/api/chat")({
               candidate: ModelCandidate,
               sys: string,
               opts: { maxRetries?: number } = {},
-            ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
+            ): Promise<{
+              text: string;
+              failed: boolean;
+              creditsOrRateLimit: boolean;
+              errorClass: "rate_limited" | "credits_or_broken" | "other" | null;
+            }> {
               const { model, label } = candidate;
               const messageId = crypto.randomUUID();
               const partId = crypto.randomUUID();
@@ -971,19 +981,20 @@ export const Route = createFileRoute("/api/chat")({
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                return { text, failed: false, creditsOrRateLimit: false };
+                return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
               } catch (e) {
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                const creditsOrRateLimit = isCreditsOrRateLimitError(e);
+                const errorClass = classifyModelError(e);
+                const creditsOrRateLimit = errorClass !== "other";
                 console.error(
-                  `[chat] ${label} stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
+                  `[chat] ${label} stream failed (${errorClass}):`,
                   e,
                 );
-                return { text, failed: true, creditsOrRateLimit };
+                return { text, failed: true, creditsOrRateLimit, errorClass };
               }
             }
 
@@ -994,15 +1005,14 @@ export const Route = createFileRoute("/api/chat")({
             };
             let primaryText = "";
             let primaryFailed = false;
+            let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
               const r = await runModel(primaryCandidate, system, { maxRetries: 2 });
               primaryText = r.text;
               primaryFailed = r.failed;
+              primaryErrorClass = r.errorClass;
               if (!primaryFailed && primaryText) {
                 await persistAssistant(primaryText, { tier: "primary" });
-                // Fire-and-forget: label the turn + stage a follow-up
-                // if the exchange described a future outcome worth
-                // checking on. Uses the same primary model.
                 extractAndSaveTurn({
                   supabase,
                   userId,
@@ -1057,6 +1067,33 @@ export const Route = createFileRoute("/api/chat")({
                 .update({ validator_status: validatorStatus, retried: didCalendarRetry })
                 .eq("id", debugPayloadId)
                 .then(() => undefined, () => undefined);
+            }
+
+            // Sticky-model rule: if the user's chosen primary was JUST
+            // rate-limited (429) and produced no text, don't hop to another
+            // model. Show a clear one-liner so they can wait or switch on
+            // purpose. 402 / 5xx / bad-key still cascade to the paid safety
+            // net so chat keeps working when the primary is truly broken.
+            if (primaryFailed && primaryErrorClass === "rate_limited" && !primaryText) {
+              const mid = crypto.randomUUID();
+              const pid = crypto.randomUUID();
+              writer.write({ type: "start", messageId: mid });
+              writer.write({ type: "start-step" });
+              writer.write({ type: "text-start", id: pid });
+              writer.write({
+                type: "text-delta",
+                id: pid,
+                delta: `**${primaryModelId}** is rate-limited right now. Wait a minute and retry, or switch to a different model from the picker.`,
+              });
+              writer.write({ type: "text-end", id: pid });
+              writer.write({ type: "finish-step" });
+              writer.write({ type: "finish" });
+              try {
+                const { summarizeThreadTitle } = await import("@/lib/thread-title.server");
+                const title = await summarizeThreadTitle(supabase, threadId);
+                if (title) await supabase.from("threads").update({ title }).eq("id", threadId);
+              } catch { /* best-effort */ }
+              return;
             }
 
             const needFallback =
