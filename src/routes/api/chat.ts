@@ -941,7 +941,12 @@ export const Route = createFileRoute("/api/chat")({
               candidate: ModelCandidate,
               sys: string,
               opts: { maxRetries?: number } = {},
-            ): Promise<{ text: string; failed: boolean; creditsOrRateLimit: boolean }> {
+            ): Promise<{
+              text: string;
+              failed: boolean;
+              creditsOrRateLimit: boolean;
+              errorClass: "rate_limited" | "credits_or_broken" | "other" | null;
+            }> {
               const { model, label } = candidate;
               const messageId = crypto.randomUUID();
               const partId = crypto.randomUUID();
@@ -976,19 +981,20 @@ export const Route = createFileRoute("/api/chat")({
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                return { text, failed: false, creditsOrRateLimit: false };
+                return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
               } catch (e) {
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
                   writer.write({ type: "finish-step" });
                   writer.write({ type: "finish" });
                 }
-                const creditsOrRateLimit = isCreditsOrRateLimitError(e);
+                const errorClass = classifyModelError(e);
+                const creditsOrRateLimit = errorClass !== "other";
                 console.error(
-                  `[chat] ${label} stream failed${creditsOrRateLimit ? " (402/429 → fallback)" : ""}:`,
+                  `[chat] ${label} stream failed (${errorClass}):`,
                   e,
                 );
-                return { text, failed: true, creditsOrRateLimit };
+                return { text, failed: true, creditsOrRateLimit, errorClass };
               }
             }
 
