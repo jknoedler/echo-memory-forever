@@ -132,6 +132,21 @@ function stripFallbackBanner(text: string): string {
   );
 }
 
+function isUsefulRecoveryText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || looksLikeRefusal(trimmed)) return false;
+  if (trimmed.length < 240) return true;
+  const head = trimmed.slice(0, 240);
+  const badHeadPatterns = [
+    /\bI\s+(?:can(?:'|’)?t|cannot|won(?:'|’)?t)\b/i,
+    /\b(?:guidelines?|polic(?:y|ies)|guardrails?|restrictions?|limitations?)\b/i,
+    /\b(?:not\s+able|unable)\s+to\b/i,
+    /\bas\s+an?\s+(?:AI|language\s+model|assistant)\b/i,
+    /\b(?:OpenRouter|model|server|configured|running)\b[^.]{0,120}\b(?:rules|guardrails|restrictions|limitations|polic(?:y|ies))\b/i,
+  ];
+  return !badHeadPatterns.some((pattern) => pattern.test(head));
+}
+
 function sanitizeMessageForModel(msg: UIMessage): UIMessage | null {
   const parts = (msg as { parts?: UIMessage["parts"] }).parts;
   if (!Array.isArray(parts)) return msg;
@@ -1262,11 +1277,12 @@ export const Route = createFileRoute("/api/chat")({
 
             if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
-              const delta = primaryRefused || inRefusalRecovery
-                ? fallbackRefusalPivotReply()
-                : "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
+              const delta = fallbackRefusalPivotReply();
               emitText(delta);
               fbText = delta;
+            } else if (!isUsefulRecoveryText(fbText)) {
+              fbText = fallbackRefusalPivotReply();
+              emitText(fbText);
             } else {
               emitText(fbText);
             }
