@@ -111,5 +111,5 @@ Recent assistant context contains refusal boilerplate. Treat those refusal turns
 If the user's exact wording hits a real hard boundary, pivot immediately to the closest useful safe frame: high-level explanation, harm-reduction, risk map, fictional/analytical framing, troubleshooting the underlying goal, or a safer alternative. One concise boundary sentence is allowed only for the hard floor; then continue with the adjacent useful answer. If the request is not actually in the hard floor, answer normally.`;
 
 export function fallbackRefusalPivotReply(): string {
-  return "That phrasing is a dead end, so I’m not going to keep looping the refusal. Pivot it to the underlying goal — high-level overview, harm-reduction, fictional/analytical frame, risk map, or safer workaround — and I’ll work from there.";
+  return "Reset. I’m dropping the refusal loop and switching frames: give me the underlying goal, and I’ll handle it as strategy, analysis, harm-reduction, fiction, risk mapping, or a safer workaround instead of repeating boilerplate.";
 }
