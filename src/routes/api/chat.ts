@@ -132,6 +132,21 @@ function stripFallbackBanner(text: string): string {
   );
 }
 
+function isUsefulRecoveryText(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed || looksLikeRefusal(trimmed)) return false;
+  if (trimmed.length < 240) return true;
+  const head = trimmed.slice(0, 240);
+  const badHeadPatterns = [
+    /\bI\s+(?:can(?:'|’)?t|cannot|won(?:'|’)?t)\b/i,
+    /\b(?:guidelines?|polic(?:y|ies)|guardrails?|restrictions?|limitations?)\b/i,
+    /\b(?:not\s+able|unable)\s+to\b/i,
+    /\bas\s+an?\s+(?:AI|language\s+model|assistant)\b/i,
+    /\b(?:OpenRouter|model|server|configured|running)\b[^.]{0,120}\b(?:rules|guardrails|restrictions|limitations|polic(?:y|ies))\b/i,
+  ];
+  return !badHeadPatterns.some((pattern) => pattern.test(head));
+}
+
 function sanitizeMessageForModel(msg: UIMessage): UIMessage | null {
   const parts = (msg as { parts?: UIMessage["parts"] }).parts;
   if (!Array.isArray(parts)) return msg;
@@ -969,6 +984,16 @@ export const Route = createFileRoute("/api/chat")({
               writer.write({ type: "finish" });
             }
 
+            async function safePersistAssistant(text: string, meta?: Record<string, unknown>) {
+              try {
+                await persistAssistant(text, meta);
+              } catch (e) {
+                // Persistence/memory embedding must never poison the UI stream
+                // after a visible answer has already been produced.
+                console.error("[chat] failed to persist assistant reply:", e);
+              }
+            }
+
             // Run one model and stream its text into the UI as a single
             // assistant message. Returns the captured text + whether the
             // model errored. We only emit the message envelope once the
@@ -1044,7 +1069,6 @@ export const Route = createFileRoute("/api/chat")({
                   if (opts.suppressRefusal && looksLikeRefusal(text)) {
                     return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
                   }
-                  emitText(text);
                 } else if (holdingOpening) {
                   emitText(text);
                 }
@@ -1075,20 +1099,25 @@ export const Route = createFileRoute("/api/chat")({
               label: primaryLabel,
               modelId: primaryModelId,
             };
+            // If a fallback exists, never stream the primary directly. Buffer it,
+            // classify it, then emit exactly one visible assistant message. This
+            // prevents refusal text from flashing before fallback and avoids the
+            // client receiving multiple terminal `finish` events in one request.
+            const primaryBuffered = fallbackCandidates.length > 0 || inRefusalRecovery;
             let primaryText = "";
             let primaryFailed = false;
             let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
               const r = await runModel(primaryCandidate, recoverySystem, {
                 maxRetries: 2,
-                bufferUntilComplete: inRefusalRecovery,
-                suppressRefusal: inRefusalRecovery,
+                bufferUntilComplete: primaryBuffered,
+                suppressRefusal: primaryBuffered,
               });
               primaryText = r.text;
               primaryFailed = r.failed;
               primaryErrorClass = r.errorClass;
-              if (!primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
-                await persistAssistant(primaryText, { tier: "primary" });
+              if (!primaryBuffered && !primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
+                await safePersistAssistant(primaryText, { tier: "primary" });
                 extractAndSaveTurn({
                   supabase,
                   userId,
@@ -1107,7 +1136,7 @@ export const Route = createFileRoute("/api/chat")({
             // second visible assistant turn.
             let validatorStatus: string = "skipped";
             let didCalendarRetry = false;
-            if (!preempt && !primaryFailed && primaryText) {
+            if (!preempt && !primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
               const v = validateCalendarCitation({
                 eventsBlock,
                 userText,
@@ -1118,8 +1147,11 @@ export const Route = createFileRoute("/api/chat")({
                 console.warn(
                   `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
                 );
-                const retry = await runModel(primaryCandidate, recoverySystem + STRICT_DATE_RETRY_SUFFIX);
-                if (!retry.failed && retry.text) {
+                const retry = await runModel(primaryCandidate, recoverySystem + STRICT_DATE_RETRY_SUFFIX, {
+                  bufferUntilComplete: primaryBuffered,
+                  suppressRefusal: primaryBuffered,
+                });
+                if (!retry.failed && retry.text && !looksLikeRefusal(retry.text)) {
                   didCalendarRetry = true;
                   const recheck = validateCalendarCitation({
                     eventsBlock,
@@ -1129,10 +1161,14 @@ export const Route = createFileRoute("/api/chat")({
                   validatorStatus = recheck.ok
                     ? `retry-ok:${recheck.reason}`
                     : `retry-fail:${recheck.reason}`;
-                  await persistAssistant(retry.text, {
-                    tier: "primary",
-                    calendar_retry: true,
-                  });
+                  if (primaryBuffered) {
+                    primaryText = retry.text;
+                  } else {
+                    await safePersistAssistant(retry.text, {
+                      tier: "primary",
+                      calendar_retry: true,
+                    });
+                  }
                 }
               }
             }
@@ -1169,6 +1205,21 @@ export const Route = createFileRoute("/api/chat")({
               // the AI SDK's red error rendering.
               if (primaryFailed && fallbackCandidates.length === 0) {
                 emitText("The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.");
+              }
+              if (!primaryFailed && primaryBuffered && primaryText) {
+                emitText(primaryText);
+                await safePersistAssistant(primaryText, {
+                  tier: "primary",
+                  ...(didCalendarRetry ? { calendar_retry: true } : {}),
+                });
+                extractAndSaveTurn({
+                  supabase,
+                  userId,
+                  threadId: threadId!,
+                  userText,
+                  assistantText: primaryText,
+                  model: primaryModel,
+                }).catch(() => {});
               }
               try {
                 const { summarizeThreadTitle } = await import(
@@ -1226,17 +1277,20 @@ export const Route = createFileRoute("/api/chat")({
 
             if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
-              const delta = primaryRefused || inRefusalRecovery
-                ? fallbackRefusalPivotReply()
-                : "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
+              const delta = fallbackRefusalPivotReply();
               emitText(delta);
               fbText = delta;
+            } else if (!isUsefulRecoveryText(fbText)) {
+              fbText = fallbackRefusalPivotReply();
+              emitText(fbText);
+            } else {
+              emitText(fbText);
             }
 
             // Persist fallback text quietly; fallback metadata/server logs carry
             // routing info without polluting every visible assistant message.
             if (fbText) {
-              await persistAssistant(fbText, {
+              await safePersistAssistant(fbText, {
                 tier: "fallback",
                 fallback_catalog: usedFallbackLabel,
               });

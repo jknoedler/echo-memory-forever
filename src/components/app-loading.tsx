@@ -12,18 +12,18 @@ import { brandFontStyle } from "@/lib/brand";
 export function AppLoading() {
   return (
     <div
-      className="fixed inset-0 z-[100] flex flex-col items-center justify-center gap-6 bg-black text-white"
+      className="min-h-screen flex flex-col items-center justify-center gap-6 bg-background text-foreground"
       role="status"
       aria-live="polite"
       aria-label="Loading MementØ"
     >
       <Mement0Mark
         size={400}
-        className="h-[33vmin] w-[33vmin] max-h-[420px] max-w-[420px] text-white animate-pulse"
+        className="h-[33vmin] w-[33vmin] max-h-[420px] max-w-[420px] text-foreground animate-pulse"
       />
       <p
         style={brandFontStyle}
-        className="text-2xl md:text-4xl tracking-[0.35em] font-semibold text-white/90 uppercase select-none"
+        className="text-2xl md:text-4xl tracking-[0.35em] font-semibold text-foreground uppercase select-none"
       >
         D<span className="font-normal">Ø</span> M<span className="font-normal">Ø</span>RE
       </p>
