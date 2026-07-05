@@ -990,6 +990,8 @@ export const Route = createFileRoute("/api/chat")({
               const partId = crypto.randomUUID();
               let started = false;
               let text = "";
+              let holdingOpening = !!opts.suppressRefusal && !opts.bufferUntilComplete;
+              let suppressedRefusal = false;
               try {
                 const run = streamText({
                   model,
@@ -1002,24 +1004,37 @@ export const Route = createFileRoute("/api/chat")({
                     throw part.error;
                   }
                   if (part.type !== "text-delta") continue;
+                  if (holdingOpening && looksLikeRefusal(text)) {
+                    suppressedRefusal = true;
+                    continue;
+                  }
+                  if (holdingOpening) {
+                    const hasEnoughOpening = text.length >= 600 || /[.!?]\s/.test(text.slice(80));
+                    if (!hasEnoughOpening) continue;
+                    holdingOpening = false;
+                  }
                   if (!started && !opts.bufferUntilComplete) {
                     writer.write({ type: "start", messageId });
                     writer.write({ type: "start-step" });
                     writer.write({ type: "text-start", id: partId });
                     started = true;
                   }
-                  text += part.text;
                   if (!opts.bufferUntilComplete) {
-                    writer.write({ type: "text-delta", id: partId, delta: part.text });
+                    writer.write({ type: "text-delta", id: partId, delta: holdingOpening ? part.text : text });
                   }
                 }
                 if (!text.trim()) {
                   throw new Error("Model returned an empty response.");
                 }
+                if (suppressedRefusal || (holdingOpening && opts.suppressRefusal && looksLikeRefusal(text))) {
+                  return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
+                }
                 if (opts.bufferUntilComplete) {
                   if (opts.suppressRefusal && looksLikeRefusal(text)) {
                     return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
                   }
+                  emitText(text);
+                } else if (holdingOpening) {
                   emitText(text);
                 }
                 if (started) {
