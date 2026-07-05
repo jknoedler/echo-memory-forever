@@ -892,7 +892,7 @@ export const Route = createFileRoute("/api/chat")({
         const refusalLoopCount = recentAssistantTexts.filter(looksLikeRefusal).length;
         const inRefusalRecovery = refusalLoopCount > 0;
         const recoverySystem = inRefusalRecovery ? `${system}${REFUSAL_RECOVERY_SUFFIX}` : system;
-        const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel));
+        const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel).filter((m): m is UIMessage => m !== null));
 
         // Persist an assistant turn (message row + memory embedding +
         // thread bookkeeping). Used for both primary and fallback messages.
