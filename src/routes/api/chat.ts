@@ -969,6 +969,16 @@ export const Route = createFileRoute("/api/chat")({
               writer.write({ type: "finish" });
             }
 
+            async function safePersistAssistant(text: string, meta?: Record<string, unknown>) {
+              try {
+                await persistAssistant(text, meta);
+              } catch (e) {
+                // Persistence/memory embedding must never poison the UI stream
+                // after a visible answer has already been produced.
+                console.error("[chat] failed to persist assistant reply:", e);
+              }
+            }
+
             // Run one model and stream its text into the UI as a single
             // assistant message. Returns the captured text + whether the
             // model errored. We only emit the message envelope once the
@@ -1092,7 +1102,7 @@ export const Route = createFileRoute("/api/chat")({
               primaryFailed = r.failed;
               primaryErrorClass = r.errorClass;
               if (!primaryBuffered && !primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
-                await persistAssistant(primaryText, { tier: "primary" });
+                await safePersistAssistant(primaryText, { tier: "primary" });
                 extractAndSaveTurn({
                   supabase,
                   userId,
@@ -1139,7 +1149,7 @@ export const Route = createFileRoute("/api/chat")({
                   if (primaryBuffered) {
                     primaryText = retry.text;
                   } else {
-                    await persistAssistant(retry.text, {
+                    await safePersistAssistant(retry.text, {
                       tier: "primary",
                       calendar_retry: true,
                     });
@@ -1183,7 +1193,7 @@ export const Route = createFileRoute("/api/chat")({
               }
               if (!primaryFailed && primaryBuffered && primaryText) {
                 emitText(primaryText);
-                await persistAssistant(primaryText, {
+                await safePersistAssistant(primaryText, {
                   tier: "primary",
                   ...(didCalendarRetry ? { calendar_retry: true } : {}),
                 });
@@ -1264,7 +1274,7 @@ export const Route = createFileRoute("/api/chat")({
             // Persist fallback text quietly; fallback metadata/server logs carry
             // routing info without polluting every visible assistant message.
             if (fbText) {
-              await persistAssistant(fbText, {
+              await safePersistAssistant(fbText, {
                 tier: "fallback",
                 fallback_catalog: usedFallbackLabel,
               });
