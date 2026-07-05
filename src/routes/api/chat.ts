@@ -43,15 +43,33 @@ import {
 } from "@/lib/followups.server";
 import type { Database } from "@/integrations/supabase/types";
 
-// Detect upstream 402 (credits exhausted) / 429 (rate-limited) failures so
-// we can route straight to the configured fallback (Venice by default)
-// instead of surfacing the gateway error to the user.
-function isCreditsOrRateLimitError(e: unknown): boolean {
+// Classify upstream errors. We split "just rate-limited" from "credits/broken"
+// because the user wants a rate-limited primary to STAY on that primary
+// (surface the rate limit; don't hop to a random other free model), while
+// 402 / 5xx / bad-key failures should fall through to the paid safety net.
+export function classifyModelError(e: unknown): "rate_limited" | "credits_or_broken" | "other" {
   const anyE = e as { statusCode?: number; status?: number; message?: string; cause?: { statusCode?: number } } | null;
   const code = anyE?.statusCode ?? anyE?.status ?? anyE?.cause?.statusCode;
-  if (code === 402 || code === 429) return true;
   const msg = (anyE?.message ?? "").toLowerCase();
-  return /\b(402|429)\b/.test(msg) || msg.includes("insufficient_quota") || msg.includes("rate limit") || msg.includes("credits");
+  if (code === 429 || /\b429\b/.test(msg) || msg.includes("rate limit") || msg.includes("rate-limit")) {
+    return "rate_limited";
+  }
+  if (
+    code === 402 ||
+    (typeof code === "number" && code >= 500) ||
+    /\b(402|5\d\d)\b/.test(msg) ||
+    msg.includes("insufficient_quota") ||
+    msg.includes("credits") ||
+    msg.includes("unauthorized") ||
+    msg.includes("invalid api key")
+  ) {
+    return "credits_or_broken";
+  }
+  return "other";
+}
+function isCreditsOrRateLimitError(e: unknown): boolean {
+  const c = classifyModelError(e);
+  return c === "rate_limited" || c === "credits_or_broken";
 }
 
 function isNewKey(v: string) {
