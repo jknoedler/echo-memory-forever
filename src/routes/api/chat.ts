@@ -1004,6 +1004,8 @@ export const Route = createFileRoute("/api/chat")({
                     throw part.error;
                   }
                   if (part.type !== "text-delta") continue;
+                  text += part.text;
+                  if (suppressedRefusal) continue;
                   if (holdingOpening && looksLikeRefusal(text)) {
                     suppressedRefusal = true;
                     continue;
@@ -1012,6 +1014,16 @@ export const Route = createFileRoute("/api/chat")({
                     const hasEnoughOpening = text.length >= 600 || /[.!?]\s/.test(text.slice(80));
                     if (!hasEnoughOpening) continue;
                     holdingOpening = false;
+                    if (!started && !opts.bufferUntilComplete) {
+                      writer.write({ type: "start", messageId });
+                      writer.write({ type: "start-step" });
+                      writer.write({ type: "text-start", id: partId });
+                      started = true;
+                    }
+                    if (!opts.bufferUntilComplete) {
+                      writer.write({ type: "text-delta", id: partId, delta: text });
+                    }
+                    continue;
                   }
                   if (!started && !opts.bufferUntilComplete) {
                     writer.write({ type: "start", messageId });
@@ -1020,7 +1032,7 @@ export const Route = createFileRoute("/api/chat")({
                     started = true;
                   }
                   if (!opts.bufferUntilComplete) {
-                    writer.write({ type: "text-delta", id: partId, delta: holdingOpening ? part.text : text });
+                    writer.write({ type: "text-delta", id: partId, delta: part.text });
                   }
                 }
                 if (!text.trim()) {
