@@ -1069,6 +1069,33 @@ export const Route = createFileRoute("/api/chat")({
                 .then(() => undefined, () => undefined);
             }
 
+            // Sticky-model rule: if the user's chosen primary was JUST
+            // rate-limited (429) and produced no text, don't hop to another
+            // model. Show a clear one-liner so they can wait or switch on
+            // purpose. 402 / 5xx / bad-key still cascade to the paid safety
+            // net so chat keeps working when the primary is truly broken.
+            if (primaryFailed && primaryErrorClass === "rate_limited" && !primaryText) {
+              const mid = crypto.randomUUID();
+              const pid = crypto.randomUUID();
+              writer.write({ type: "start", messageId: mid });
+              writer.write({ type: "start-step" });
+              writer.write({ type: "text-start", id: pid });
+              writer.write({
+                type: "text-delta",
+                id: pid,
+                delta: `**${primaryModelId}** is rate-limited right now. Wait a minute and retry, or switch to a different model from the picker.`,
+              });
+              writer.write({ type: "text-end", id: pid });
+              writer.write({ type: "finish-step" });
+              writer.write({ type: "finish" });
+              try {
+                const { summarizeThreadTitle } = await import("@/lib/thread-title.server");
+                const title = await summarizeThreadTitle(supabase, threadId);
+                if (title) await supabase.from("threads").update({ title }).eq("id", threadId);
+              } catch { /* best-effort */ }
+              return;
+            }
+
             const needFallback =
               fallbackCandidates.length > 0 &&
               (preempt || primaryFailed || looksLikeRefusal(primaryText));
