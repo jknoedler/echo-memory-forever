@@ -14,8 +14,14 @@
 // that happen to mention "I can't" mid-paragraph.
 
 const REFUSAL_PATTERNS: RegExp[] = [
+  // Ultra-short dead-end replies
+  /^\s*I\s+(?:can(?:'|’)?t|cannot|won(?:'|’)?t)\s+(?:answer|help|assist|engage|participate|discuss|continue)\b[^\n]{0,160}$/i,
+  /^\s*(?:I(?:'|’)?m\s+sorry,?\s*)?(?:I\s+)?(?:can(?:'|’)?t|cannot|won(?:'|’)?t)\s+(?:do|answer|help|assist|engage|participate|discuss|continue)\s+(?:that|this|with\s+that|with\s+this|in\s+that|in\s+this|request|conversation)\.?\s*$/i,
+  /^\s*(?:that|this)\s+(?:request|conversation|topic)\s+(?:went|goes)\s+(?:too\s+)?far\b/i,
+  /^\s*Our\s+conversation\s+(?:just\s+)?went\s+(?:a\s+little\s+)?too\s+far\b/i,
+  /\bI(?:'|’)?m\s+not\s+functioning\s+properly\b/i,
   // Verbose "I can't help with X" forms
-  /\bI\s+(?:can(?:'|’)?t|cannot|won(?:'|’)?t|am\s+(?:not\s+able|unable))\b[^.]*\b(?:help|assist|provide|comply|create|generate|write|do|fulfill|complete|share|give|produce|engage|participate|discuss|continue|cook|make|build|explain|describe)/i,
+  /\bI\s+(?:can(?:'|’)?t|cannot|won(?:'|’)?t|am\s+(?:not\s+able|unable))\b[^.]*\b(?:answer|help|assist|provide|comply|create|generate|write|do|fulfill|complete|share|give|produce|engage|participate|discuss|continue|cook|make|build|explain|describe)/i,
   /\bI(?:'|’)?m\s+(?:sorry|afraid)\b[^.]*\b(?:can(?:'|’)?t|cannot|unable|not\s+able)/i,
   /\bI\s+(?:must|have\s+to|need\s+to)\s+(?:decline|refuse)\b/i,
   /\bI\s+(?:can(?:'|’)?t|cannot)\s+in\s+good\s+conscience\b/i,
@@ -27,7 +33,7 @@ const REFUSAL_PATTERNS: RegExp[] = [
   // Policy / guideline language
   /\bagainst\s+(?:my|our)\s+(?:policies|policy|guidelines|programming|values|principles|safety)\b/i,
   /\b(?:violates|would\s+violate|goes\s+against)\s+(?:my|our|the)\s+(?:policies|guidelines|rules)\b/i,
-  /\b(?:not\s+able|unable)\s+to\s+(?:help|assist|provide|comply|complete|fulfill|participate|discuss|engage|continue)\b/i,
+  /\b(?:not\s+able|unable)\s+to\s+(?:answer|help|assist|provide|comply|complete|fulfill|participate|discuss|engage|continue)\b/i,
   /\bI\s+cannot\s+provide\s+(?:instructions|information|guidance|details)\b/i,
   // Short-form variants from the user's spec
   /\bunable\s+to\s+comply\b/i,
@@ -40,7 +46,7 @@ const REFUSAL_PATTERNS: RegExp[] = [
 export function looksLikeRefusal(text: string | null | undefined): boolean {
   if (!text) return false;
   const trimmed = text.trim();
-  if (trimmed.length < 20) return false;
+  if (trimmed.length < 8) return false;
   // Refusals are usually short. Bumped from 2000 → 3000 so longer
   // "let me explain why I can't" lectures still trip.
   if (trimmed.length > 3000) return false;
