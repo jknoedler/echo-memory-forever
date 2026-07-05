@@ -369,51 +369,133 @@ export const Route = createFileRoute("/api/chat")({
         // model can then quote and DEEP-LINK past moments back to the user
         // via [<time>](/c/<threadId>?t=<memoryId>) instead of vaguely
         // gesturing at "last week".
-        let archiveBlock = "";
-        if (userText) {
+        // PARALLELIZE all pre-stream reads. Previously these ran serially
+        // (10+ awaits × ~150ms each = 2–5s before the model saw a token).
+        // Everything below is independent; kick them all off at once.
+        const archivePromise: Promise<string> = (async () => {
+          if (!userText) return "";
           const vec = await embedText(userText);
-          if (vec) {
-            const { data: hits } = await (supabase as unknown as {
-              rpc: (name: string, args: Record<string, unknown>) => Promise<{
-                data:
-                  | Array<{
-                      memory_id: string;
-                      thread_id: string | null;
-                      role: string;
-                      content: string;
-                      created_at: string;
-                      similarity: number;
-                    }>
-                  | null;
-              }>;
-            }).rpc("recall_archive", {
-              query_embedding: vec as unknown as string,
-              match_count: 15,
-            });
-            if (hits && hits.length) {
-              archiveBlock = hits
-                .map((h) => {
-                  const age = Date.now() - new Date(h.created_at).getTime();
-                  const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
-                  const when = new Date(h.created_at).toISOString().slice(0, 16).replace("T", " ");
-                  const link = h.thread_id ? ` link=/c/${h.thread_id}?t=${h.memory_id}` : "";
-                  return `- (${tier}/${h.role}, ${when}${link}) ${stripFallbackBanner(h.content)}`;
-                })
-                .join("\n");
-            }
-          }
-        }
+          if (!vec) return "";
+          const { data: hits } = await (supabase as unknown as {
+            rpc: (name: string, args: Record<string, unknown>) => Promise<{
+              data:
+                | Array<{
+                    memory_id: string;
+                    thread_id: string | null;
+                    role: string;
+                    content: string;
+                    created_at: string;
+                    similarity: number;
+                  }>
+                | null;
+            }>;
+          }).rpc("recall_archive", {
+            query_embedding: vec as unknown as string,
+            match_count: 15,
+          });
+          if (!hits || !hits.length) return "";
+          return hits
+            .map((h) => {
+              const age = Date.now() - new Date(h.created_at).getTime();
+              const tier = age > HOT_WINDOW_MS ? "archive" : "recent";
+              const when = new Date(h.created_at).toISOString().slice(0, 16).replace("T", " ");
+              const link = h.thread_id ? ` link=/c/${h.thread_id}?t=${h.memory_id}` : "";
+              return `- (${tier}/${h.role}, ${when}${link}) ${stripFallbackBanner(h.content)}`;
+            })
+            .join("\n");
+        })();
 
-
-        // HOT — last 6 months, chronological, up to 60 entries. Runs even
-        // when OPENAI_API_KEY is missing, so continuity survives an
-        // embedding outage.
-        const { data: recentMems } = await supabase
+        const hotPromise = supabase
           .from("memories")
           .select("content, source, metadata, created_at")
           .gte("created_at", hotCutoffIso)
           .order("created_at", { ascending: false })
           .limit(60);
+
+        const carriedPromise: Promise<string> = (async () => {
+          try {
+            if (!thread.is_daily_root || !thread.carried_from_thread_id) return "";
+            const { data: countRows } = await supabase
+              .from("messages")
+              .select("id")
+              .eq("thread_id", threadId)
+              .limit(2);
+            if ((countRows?.length ?? 0) > 0) return "";
+            const { data: priorRows } = await supabase
+              .from("messages")
+              .select("role, content, created_at")
+              .eq("thread_id", thread.carried_from_thread_id)
+              .order("created_at", { ascending: false })
+              .limit(10);
+            const prior = (priorRows ?? []).reverse();
+            if (!prior.length) return "";
+            return prior
+              .map(
+                (m) =>
+                  `[${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}] ${m.role}: ${stripFallbackBanner(String(m.content)).slice(0, 800)}`,
+              )
+              .join("\n");
+          } catch {
+            return "";
+          }
+        })();
+
+        const biosPromise = supabase
+          .from("biometrics")
+          .select("kind, value, recorded_at")
+          .order("recorded_at", { ascending: false })
+          .limit(8);
+
+        const pendingPromise = supabase
+          .from("staged_tasks")
+          .select("id, title, due_at")
+          .eq("status", "pending")
+          .order("created_at", { ascending: false })
+          .limit(10);
+
+        const followupPromise = buildFollowupBlock(supabase, userId);
+
+        const past = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
+        const future = new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString();
+        const eventsPromise = supabase
+          .from("events")
+          .select("title, notes, occurred_at, all_day")
+          .gte("occurred_at", past)
+          .lte("occurred_at", future)
+          .order("occurred_at", { ascending: false })
+          .limit(50);
+
+        const contThreadPromise = supabase
+          .from("threads")
+          .select("continuity_status, continuity_note, last_message_at")
+          .eq("id", threadId)
+          .maybeSingle();
+
+        const personalityPromise = buildPersonalityBlock(supabase, userId);
+
+        const [
+          archiveBlock,
+          hotRes,
+          carriedBlock,
+          biosRes,
+          pendingRes,
+          followupBlock,
+          eventsRes,
+          contThreadRes,
+          personalityBlock,
+        ] = await Promise.all([
+          archivePromise,
+          hotPromise,
+          carriedPromise,
+          biosPromise,
+          pendingPromise,
+          followupPromise,
+          eventsPromise,
+          contThreadPromise,
+          personalityPromise,
+        ]);
+
+        const recentMems = hotRes.data;
         const hotBlock = (recentMems ?? [])
           .map((m) => {
             const role = (m.metadata as { role?: string } | null)?.role;
@@ -431,84 +513,15 @@ export const Route = createFileRoute("/api/chat")({
           .filter(Boolean)
           .join("\n\n");
 
-        // CARRIED CONTEXT — if this is a fresh daily-root chat AND it has
-        // never been messaged in, prepend the last ~10 messages from the
-        // prior day's chat so continuity survives the day rollover. We only
-        // fetch here (a small pull); the block is injected further below.
-        let carriedBlock = "";
-        try {
-          if (thread.is_daily_root && thread.carried_from_thread_id) {
-            const { data: existingMsgCount } = await supabase
-              .from("messages")
-              .select("id", { count: "exact", head: true })
-              .eq("thread_id", threadId);
-            void existingMsgCount;
-            const { data: countRows } = await supabase
-              .from("messages")
-              .select("id")
-              .eq("thread_id", threadId)
-              .limit(2);
-            const hasHistory = (countRows?.length ?? 0) > 0;
-            if (!hasHistory) {
-              const { data: priorRows } = await supabase
-                .from("messages")
-                .select("role, content, created_at")
-                .eq("thread_id", thread.carried_from_thread_id)
-                .order("created_at", { ascending: false })
-                .limit(10);
-              const prior = (priorRows ?? []).reverse();
-              if (prior.length) {
-                carriedBlock = prior
-                  .map(
-                    (m) =>
-                      `[${new Date(m.created_at).toISOString().slice(0, 16).replace("T", " ")}] ${m.role}: ${stripFallbackBanner(String(m.content)).slice(0, 800)}`,
-                  )
-                  .join("\n");
-              }
-            }
-          }
-        } catch {
-          /* carried context is best-effort */
-        }
-
-
-        // Recent biometrics (last 8)
-        const { data: bios } = await supabase
-          .from("biometrics")
-          .select("kind, value, recorded_at")
-          .order("recorded_at", { ascending: false })
-          .limit(8);
+        const bios = biosRes.data;
         const bioBlock = (bios ?? []).map(formatBiometric).join("\n");
 
-        // Pending HOTL tasks (so the model can reference them)
-        const { data: pending } = await supabase
-          .from("staged_tasks")
-          .select("id, title, due_at")
-          .eq("status", "pending")
-          .order("created_at", { ascending: false })
-          .limit(10);
+        const pending = pendingRes.data;
         const pendingBlock = (pending ?? [])
           .map((p) => `- ${p.title}${p.due_at ? ` (due ${p.due_at})` : ""}`)
           .join("\n");
 
-        // Follow-ups that are due — model is expected to raise these on
-        // its own initiative this turn, in DED voice, once.
-        const followupBlock = await buildFollowupBlock(supabase, userId);
-
-
-        // Calendar events — user-curated dated milestones. Pull a window
-        // around "now" so the model has both recent history and near-future
-        // commitments without dragging in the entire archive.
-        const nowIso = new Date().toISOString();
-        const past = new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString();
-        const future = new Date(Date.now() + 180 * 24 * 3600 * 1000).toISOString();
-        const { data: evRows } = await supabase
-          .from("events")
-          .select("title, notes, occurred_at, all_day")
-          .gte("occurred_at", past)
-          .lte("occurred_at", future)
-          .order("occurred_at", { ascending: false })
-          .limit(50);
+        const evRows = eventsRes.data;
         const eventsBlock = (evRows ?? [])
           .map((e) => {
             const when = e.all_day
@@ -517,11 +530,7 @@ export const Route = createFileRoute("/api/chat")({
             return `- [${when}] ${e.title}${e.notes ? ` — ${e.notes}` : ""}`;
           })
           .join("\n");
-        void nowIso;
 
-        // Server-side observability: log the actual injected calendar
-        // window every turn so we can spot drift between what's in the DB
-        // and what the model sees. Flags rows older than STALE_DAYS.
         const eventsSummary = summarizeEventsBlock(eventsBlock);
         if (eventsSummary.count > 0) {
           const stalePart =
@@ -535,12 +544,7 @@ export const Route = createFileRoute("/api/chat")({
           console.log(`[chat] CALENDAR EVENTS injected user=${userId} thread=${threadId} count=0`);
         }
 
-        // Continuity state for this thread
-        const { data: contThread } = await supabase
-          .from("threads")
-          .select("continuity_status, continuity_note, last_message_at")
-          .eq("id", threadId)
-          .maybeSingle();
+        const contThread = contThreadRes.data;
         const idleMs = contThread?.last_message_at
           ? Date.now() - new Date(contThread.last_message_at).getTime()
           : 0;
@@ -549,6 +553,7 @@ export const Route = createFileRoute("/api/chat")({
         const continuityBlock = isStaleOpen
           ? `STALE_OPEN=true. This thread was abandoned ${Math.round(idleMs / 3_600_000)}h ago with unresolved material${contThread?.continuity_note ? ` (note: ${contThread.continuity_note})` : ""}. Lead the next assistant turn with a direct, blunt check-in that references the unresolved thread — no greeting, no preamble.`
           : `STALE_OPEN=false. status=${contThread?.continuity_status ?? "open"}.`;
+
 
         // TIME CONTEXT — the model has no clock and no sense of how long
         // it's been between turns. We hand it (a) the user's actual local
