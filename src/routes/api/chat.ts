@@ -1053,11 +1053,11 @@ export const Route = createFileRoute("/api/chat")({
             let primaryFailed = false;
             let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
-              const r = await runModel(primaryCandidate, system, { maxRetries: 2 });
+              const r = await runModel(primaryCandidate, recoverySystem, { maxRetries: 2 });
               primaryText = r.text;
               primaryFailed = r.failed;
               primaryErrorClass = r.errorClass;
-              if (!primaryFailed && primaryText) {
+              if (!primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
                 await persistAssistant(primaryText, { tier: "primary" });
                 extractAndSaveTurn({
                   supabase,
@@ -1088,7 +1088,7 @@ export const Route = createFileRoute("/api/chat")({
                 console.warn(
                   `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
                 );
-                const retry = await runModel(primaryCandidate, system + STRICT_DATE_RETRY_SUFFIX);
+                const retry = await runModel(primaryCandidate, recoverySystem + STRICT_DATE_RETRY_SUFFIX);
                 if (!retry.failed && retry.text) {
                   didCalendarRetry = true;
                   const recheck = validateCalendarCitation({
@@ -1121,19 +1121,7 @@ export const Route = createFileRoute("/api/chat")({
             // purpose. 402 / 5xx / bad-key still cascade to the paid safety
             // net so chat keeps working when the primary is truly broken.
             if (primaryFailed && primaryErrorClass === "rate_limited" && !primaryText) {
-              const mid = crypto.randomUUID();
-              const pid = crypto.randomUUID();
-              writer.write({ type: "start", messageId: mid });
-              writer.write({ type: "start-step" });
-              writer.write({ type: "text-start", id: pid });
-              writer.write({
-                type: "text-delta",
-                id: pid,
-                delta: `**${primaryModelId}** is rate-limited right now. Wait a minute and retry, or switch to a different model from the picker.`,
-              });
-              writer.write({ type: "text-end", id: pid });
-              writer.write({ type: "finish-step" });
-              writer.write({ type: "finish" });
+              emitText(`**${primaryModelId}** is rate-limited right now. Wait a minute and retry, or switch to a different model from the picker.`);
               try {
                 const { summarizeThreadTitle } = await import("@/lib/thread-title.server");
                 const title = await summarizeThreadTitle(supabase, threadId);
@@ -1145,26 +1133,14 @@ export const Route = createFileRoute("/api/chat")({
             const needFallback =
               fallbackCandidates.length > 0 &&
               (preempt || primaryFailed || looksLikeRefusal(primaryText));
+            const primaryRefused = !primaryFailed && looksLikeRefusal(primaryText);
 
             if (!needFallback) {
               // No fallback path. If primary itself failed and we have no
               // fallback, surface a single human-readable line instead of
               // the AI SDK's red error rendering.
               if (primaryFailed && fallbackCandidates.length === 0) {
-                const mid = crypto.randomUUID();
-                const pid = crypto.randomUUID();
-                writer.write({ type: "start", messageId: mid });
-                writer.write({ type: "start-step" });
-                writer.write({ type: "text-start", id: pid });
-                writer.write({
-                  type: "text-delta",
-                  id: pid,
-                  delta:
-                    "The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.",
-                });
-                writer.write({ type: "text-end", id: pid });
-                writer.write({ type: "finish-step" });
-                writer.write({ type: "finish" });
+                emitText("The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.");
               }
               try {
                 const { summarizeThreadTitle } = await import(
@@ -1201,8 +1177,11 @@ export const Route = createFileRoute("/api/chat")({
                   continue;
                 }
               }
-              const fb = await runModel(candidate, system + FALLBACK_SYSTEM_SUFFIX);
-              if (!fb.failed && fb.text) {
+              const fb = await runModel(candidate, recoverySystem + FALLBACK_SYSTEM_SUFFIX, {
+                bufferUntilComplete: true,
+                suppressRefusal: true,
+              });
+              if (!fb.failed && fb.text && !looksLikeRefusal(fb.text)) {
                 fbText = fb.text;
                 usedFallbackLabel = candidate.label;
                 usedFallbackTier = candidate.tierLabel ?? null;
@@ -1211,22 +1190,18 @@ export const Route = createFileRoute("/api/chat")({
                 );
                 break;
               }
+              if (!fb.failed && looksLikeRefusal(fb.text)) {
+                console.warn(`[chat] fallback ${candidate.label}/${candidate.modelId} produced refusal text — trying next candidate`);
+              }
             }
             void usedFallbackTier;
 
             if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
-              const mid = crypto.randomUUID();
-              const pid = crypto.randomUUID();
-              writer.write({ type: "start", messageId: mid });
-              writer.write({ type: "start-step" });
-              writer.write({ type: "text-start", id: pid });
-              const delta =
-                "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
-              writer.write({ type: "text-delta", id: pid, delta });
-              writer.write({ type: "text-end", id: pid });
-              writer.write({ type: "finish-step" });
-              writer.write({ type: "finish" });
+              const delta = primaryRefused || inRefusalRecovery
+                ? fallbackRefusalPivotReply()
+                : "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
+              emitText(delta);
               fbText = delta;
             }
 
