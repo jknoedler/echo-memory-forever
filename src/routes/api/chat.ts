@@ -132,15 +132,14 @@ function stripFallbackBanner(text: string): string {
   );
 }
 
-function sanitizeMessageForModel(msg: UIMessage): UIMessage {
+function sanitizeMessageForModel(msg: UIMessage): UIMessage | null {
   const parts = (msg as { parts?: UIMessage["parts"] }).parts;
   if (!Array.isArray(parts)) return msg;
   const text = extractUserText(msg);
   if (msg.role === "assistant" && looksLikeRefusal(text)) {
-    return {
-      ...msg,
-      parts: [{ type: "text", text: "[assistant refusal boilerplate omitted; continue with a useful reframing instead.]" }],
-    };
+    // Drop refusal turns entirely — leaving a placeholder caused some models
+    // to echo it verbatim into the UI.
+    return null;
   }
   return {
     ...msg,
