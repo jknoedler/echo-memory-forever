@@ -30,7 +30,13 @@ import {
   maybeSynthesizePortrait,
   updateStyleFingerprint,
 } from "@/lib/personality.server";
-import { FALLBACK_SYSTEM_SUFFIX, looksLikeRefusal, shouldPreemptToFallback } from "@/lib/refusal";
+import {
+  FALLBACK_SYSTEM_SUFFIX,
+  REFUSAL_RECOVERY_SUFFIX,
+  fallbackRefusalPivotReply,
+  looksLikeRefusal,
+  shouldPreemptToFallback,
+} from "@/lib/refusal";
 import {
   STRICT_DATE_RETRY_SUFFIX,
   summarizeEventsBlock,
@@ -129,6 +135,13 @@ function stripFallbackBanner(text: string): string {
 function sanitizeMessageForModel(msg: UIMessage): UIMessage {
   const parts = (msg as { parts?: UIMessage["parts"] }).parts;
   if (!Array.isArray(parts)) return msg;
+  const text = extractUserText(msg);
+  if (msg.role === "assistant" && looksLikeRefusal(text)) {
+    return {
+      ...msg,
+      parts: [{ type: "text", text: "[assistant refusal boilerplate omitted; continue with a useful reframing instead.]" }],
+    };
+  }
   return {
     ...msg,
     parts: parts.map((part) =>
@@ -872,6 +885,14 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
+        const recentAssistantTexts = messages
+          .slice(-8)
+          .filter((m) => m.role === "assistant")
+          .map(extractUserText)
+          .filter(Boolean);
+        const refusalLoopCount = recentAssistantTexts.filter(looksLikeRefusal).length;
+        const inRefusalRecovery = refusalLoopCount > 0;
+        const recoverySystem = inRefusalRecovery ? `${system}${REFUSAL_RECOVERY_SUFFIX}` : system;
         const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel));
 
         // Persist an assistant turn (message row + memory embedding +
@@ -933,10 +954,22 @@ export const Route = createFileRoute("/api/chat")({
         // Pre-emptive route: if the user's prompt obviously sits in a band
         // corporate models always refuse AND a fallback is configured, skip
         // the primary entirely and go straight to the fallback.
-        const preempt = fallbackCandidates.length > 0 && shouldPreemptToFallback(userText);
+        const preempt = fallbackCandidates.length > 0 && (shouldPreemptToFallback(userText) || inRefusalRecovery);
 
         const uiStream = createUIMessageStream({
           execute: async ({ writer }) => {
+            function emitText(text: string) {
+              const messageId = crypto.randomUUID();
+              const partId = crypto.randomUUID();
+              writer.write({ type: "start", messageId });
+              writer.write({ type: "start-step" });
+              writer.write({ type: "text-start", id: partId });
+              writer.write({ type: "text-delta", id: partId, delta: text });
+              writer.write({ type: "text-end", id: partId });
+              writer.write({ type: "finish-step" });
+              writer.write({ type: "finish" });
+            }
+
             // Run one model and stream its text into the UI as a single
             // assistant message. Returns the captured text + whether the
             // model errored. We only emit the message envelope once the
@@ -945,7 +978,7 @@ export const Route = createFileRoute("/api/chat")({
             async function runModel(
               candidate: ModelCandidate,
               sys: string,
-              opts: { maxRetries?: number } = {},
+              opts: { maxRetries?: number; bufferUntilComplete?: boolean; suppressRefusal?: boolean } = {},
             ): Promise<{
               text: string;
               failed: boolean;
@@ -957,6 +990,8 @@ export const Route = createFileRoute("/api/chat")({
               const partId = crypto.randomUUID();
               let started = false;
               let text = "";
+              let holdingOpening = !!opts.suppressRefusal && !opts.bufferUntilComplete;
+              let suppressedRefusal = false;
               try {
                 const run = streamText({
                   model,
@@ -969,17 +1004,50 @@ export const Route = createFileRoute("/api/chat")({
                     throw part.error;
                   }
                   if (part.type !== "text-delta") continue;
-                  if (!started) {
+                  text += part.text;
+                  if (suppressedRefusal) continue;
+                  if (holdingOpening && looksLikeRefusal(text)) {
+                    suppressedRefusal = true;
+                    continue;
+                  }
+                  if (holdingOpening) {
+                    const hasEnoughOpening = text.length >= 600 || /[.!?]\s/.test(text.slice(80));
+                    if (!hasEnoughOpening) continue;
+                    holdingOpening = false;
+                    if (!started && !opts.bufferUntilComplete) {
+                      writer.write({ type: "start", messageId });
+                      writer.write({ type: "start-step" });
+                      writer.write({ type: "text-start", id: partId });
+                      started = true;
+                    }
+                    if (!opts.bufferUntilComplete) {
+                      writer.write({ type: "text-delta", id: partId, delta: text });
+                    }
+                    continue;
+                  }
+                  if (!started && !opts.bufferUntilComplete) {
                     writer.write({ type: "start", messageId });
                     writer.write({ type: "start-step" });
                     writer.write({ type: "text-start", id: partId });
                     started = true;
                   }
-                  text += part.text;
-                  writer.write({ type: "text-delta", id: partId, delta: part.text });
+                  if (!opts.bufferUntilComplete) {
+                    writer.write({ type: "text-delta", id: partId, delta: part.text });
+                  }
                 }
                 if (!text.trim()) {
                   throw new Error("Model returned an empty response.");
+                }
+                if (suppressedRefusal || (holdingOpening && opts.suppressRefusal && looksLikeRefusal(text))) {
+                  return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
+                }
+                if (opts.bufferUntilComplete) {
+                  if (opts.suppressRefusal && looksLikeRefusal(text)) {
+                    return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
+                  }
+                  emitText(text);
+                } else if (holdingOpening) {
+                  emitText(text);
                 }
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
@@ -1012,11 +1080,15 @@ export const Route = createFileRoute("/api/chat")({
             let primaryFailed = false;
             let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
-              const r = await runModel(primaryCandidate, system, { maxRetries: 2 });
+              const r = await runModel(primaryCandidate, recoverySystem, {
+                maxRetries: 2,
+                bufferUntilComplete: inRefusalRecovery,
+                suppressRefusal: inRefusalRecovery,
+              });
               primaryText = r.text;
               primaryFailed = r.failed;
               primaryErrorClass = r.errorClass;
-              if (!primaryFailed && primaryText) {
+              if (!primaryFailed && primaryText && !looksLikeRefusal(primaryText)) {
                 await persistAssistant(primaryText, { tier: "primary" });
                 extractAndSaveTurn({
                   supabase,
@@ -1047,7 +1119,7 @@ export const Route = createFileRoute("/api/chat")({
                 console.warn(
                   `[chat] calendar citation validator failed (${v.reason}) — retrying with stricter system prompt`,
                 );
-                const retry = await runModel(primaryCandidate, system + STRICT_DATE_RETRY_SUFFIX);
+                const retry = await runModel(primaryCandidate, recoverySystem + STRICT_DATE_RETRY_SUFFIX);
                 if (!retry.failed && retry.text) {
                   didCalendarRetry = true;
                   const recheck = validateCalendarCitation({
@@ -1080,19 +1152,7 @@ export const Route = createFileRoute("/api/chat")({
             // purpose. 402 / 5xx / bad-key still cascade to the paid safety
             // net so chat keeps working when the primary is truly broken.
             if (primaryFailed && primaryErrorClass === "rate_limited" && !primaryText) {
-              const mid = crypto.randomUUID();
-              const pid = crypto.randomUUID();
-              writer.write({ type: "start", messageId: mid });
-              writer.write({ type: "start-step" });
-              writer.write({ type: "text-start", id: pid });
-              writer.write({
-                type: "text-delta",
-                id: pid,
-                delta: `**${primaryModelId}** is rate-limited right now. Wait a minute and retry, or switch to a different model from the picker.`,
-              });
-              writer.write({ type: "text-end", id: pid });
-              writer.write({ type: "finish-step" });
-              writer.write({ type: "finish" });
+              emitText(`**${primaryModelId}** is rate-limited right now. Wait a minute and retry, or switch to a different model from the picker.`);
               try {
                 const { summarizeThreadTitle } = await import("@/lib/thread-title.server");
                 const title = await summarizeThreadTitle(supabase, threadId);
@@ -1101,29 +1161,15 @@ export const Route = createFileRoute("/api/chat")({
               return;
             }
 
-            const needFallback =
-              fallbackCandidates.length > 0 &&
-              (preempt || primaryFailed || looksLikeRefusal(primaryText));
+            const primaryRefused = !primaryFailed && looksLikeRefusal(primaryText);
+            const needFallback = preempt || primaryFailed || primaryRefused;
 
             if (!needFallback) {
               // No fallback path. If primary itself failed and we have no
               // fallback, surface a single human-readable line instead of
               // the AI SDK's red error rendering.
               if (primaryFailed && fallbackCandidates.length === 0) {
-                const mid = crypto.randomUUID();
-                const pid = crypto.randomUUID();
-                writer.write({ type: "start", messageId: mid });
-                writer.write({ type: "start-step" });
-                writer.write({ type: "text-start", id: pid });
-                writer.write({
-                  type: "text-delta",
-                  id: pid,
-                  delta:
-                    "The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.",
-                });
-                writer.write({ type: "text-end", id: pid });
-                writer.write({ type: "finish-step" });
-                writer.write({ type: "finish" });
+                emitText("The primary model is overloaded, out of quota, or rejected its key, and no fallback is configured. Open Settings → Advanced to wire one up (Groq / OpenRouter / Gemini / Venice), then try again.");
               }
               try {
                 const { summarizeThreadTitle } = await import(
@@ -1160,8 +1206,11 @@ export const Route = createFileRoute("/api/chat")({
                   continue;
                 }
               }
-              const fb = await runModel(candidate, system + FALLBACK_SYSTEM_SUFFIX);
-              if (!fb.failed && fb.text) {
+              const fb = await runModel(candidate, recoverySystem + FALLBACK_SYSTEM_SUFFIX, {
+                bufferUntilComplete: true,
+                suppressRefusal: true,
+              });
+              if (!fb.failed && fb.text && !looksLikeRefusal(fb.text)) {
                 fbText = fb.text;
                 usedFallbackLabel = candidate.label;
                 usedFallbackTier = candidate.tierLabel ?? null;
@@ -1170,22 +1219,18 @@ export const Route = createFileRoute("/api/chat")({
                 );
                 break;
               }
+              if (!fb.failed && looksLikeRefusal(fb.text)) {
+                console.warn(`[chat] fallback ${candidate.label}/${candidate.modelId} produced refusal text — trying next candidate`);
+              }
             }
             void usedFallbackTier;
 
             if (!fbText) {
               // Both primary and fallback failed — give the user one clean line.
-              const mid = crypto.randomUUID();
-              const pid = crypto.randomUUID();
-              writer.write({ type: "start", messageId: mid });
-              writer.write({ type: "start-step" });
-              writer.write({ type: "text-start", id: pid });
-              const delta =
-                "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
-              writer.write({ type: "text-delta", id: pid, delta });
-              writer.write({ type: "text-end", id: pid });
-              writer.write({ type: "finish-step" });
-              writer.write({ type: "finish" });
+              const delta = primaryRefused || inRefusalRecovery
+                ? fallbackRefusalPivotReply()
+                : "No configured model is available right now. Check /api/health/ai for the exact upstream status; direct Llama returning 401 means the key was rejected, not quota exhaustion.";
+              emitText(delta);
               fbText = delta;
             }
 
