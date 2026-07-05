@@ -132,15 +132,14 @@ function stripFallbackBanner(text: string): string {
   );
 }
 
-function sanitizeMessageForModel(msg: UIMessage): UIMessage {
+function sanitizeMessageForModel(msg: UIMessage): UIMessage | null {
   const parts = (msg as { parts?: UIMessage["parts"] }).parts;
   if (!Array.isArray(parts)) return msg;
   const text = extractUserText(msg);
   if (msg.role === "assistant" && looksLikeRefusal(text)) {
-    return {
-      ...msg,
-      parts: [{ type: "text", text: "[assistant refusal boilerplate omitted; continue with a useful reframing instead.]" }],
-    };
+    // Drop refusal turns entirely — leaving a placeholder caused some models
+    // to echo it verbatim into the UI.
+    return null;
   }
   return {
     ...msg,
@@ -893,7 +892,7 @@ export const Route = createFileRoute("/api/chat")({
         const refusalLoopCount = recentAssistantTexts.filter(looksLikeRefusal).length;
         const inRefusalRecovery = refusalLoopCount > 0;
         const recoverySystem = inRefusalRecovery ? `${system}${REFUSAL_RECOVERY_SUFFIX}` : system;
-        const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel));
+        const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel).filter((m): m is UIMessage => m !== null));
 
         // Persist an assistant turn (message row + memory embedding +
         // thread bookkeeping). Used for both primary and fallback messages.
