@@ -1053,7 +1053,11 @@ export const Route = createFileRoute("/api/chat")({
             let primaryFailed = false;
             let primaryErrorClass: "rate_limited" | "credits_or_broken" | "other" | null = null;
             if (!preempt) {
-              const r = await runModel(primaryCandidate, recoverySystem, { maxRetries: 2 });
+              const r = await runModel(primaryCandidate, recoverySystem, {
+                maxRetries: 2,
+                bufferUntilComplete: true,
+                suppressRefusal: true,
+              });
               primaryText = r.text;
               primaryFailed = r.failed;
               primaryErrorClass = r.errorClass;
@@ -1130,10 +1134,8 @@ export const Route = createFileRoute("/api/chat")({
               return;
             }
 
-            const needFallback =
-              fallbackCandidates.length > 0 &&
-              (preempt || primaryFailed || looksLikeRefusal(primaryText));
             const primaryRefused = !primaryFailed && looksLikeRefusal(primaryText);
+            const needFallback = preempt || primaryFailed || primaryRefused;
 
             if (!needFallback) {
               // No fallback path. If primary itself failed and we have no
