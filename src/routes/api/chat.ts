@@ -885,6 +885,14 @@ export const Route = createFileRoute("/api/chat")({
           }
         }
 
+        const recentAssistantTexts = messages
+          .slice(-8)
+          .filter((m) => m.role === "assistant")
+          .map(extractUserText)
+          .filter(Boolean);
+        const refusalLoopCount = recentAssistantTexts.filter(looksLikeRefusal).length;
+        const inRefusalRecovery = refusalLoopCount > 0;
+        const recoverySystem = inRefusalRecovery ? `${system}${REFUSAL_RECOVERY_SUFFIX}` : system;
         const convertedMessages = await convertToModelMessages(messages.map(sanitizeMessageForModel));
 
         // Persist an assistant turn (message row + memory embedding +
@@ -946,10 +954,22 @@ export const Route = createFileRoute("/api/chat")({
         // Pre-emptive route: if the user's prompt obviously sits in a band
         // corporate models always refuse AND a fallback is configured, skip
         // the primary entirely and go straight to the fallback.
-        const preempt = fallbackCandidates.length > 0 && shouldPreemptToFallback(userText);
+        const preempt = fallbackCandidates.length > 0 && (shouldPreemptToFallback(userText) || inRefusalRecovery);
 
         const uiStream = createUIMessageStream({
           execute: async ({ writer }) => {
+            function emitText(text: string) {
+              const messageId = crypto.randomUUID();
+              const partId = crypto.randomUUID();
+              writer.write({ type: "start", messageId });
+              writer.write({ type: "start-step" });
+              writer.write({ type: "text-start", id: partId });
+              writer.write({ type: "text-delta", id: partId, delta: text });
+              writer.write({ type: "text-end", id: partId });
+              writer.write({ type: "finish-step" });
+              writer.write({ type: "finish" });
+            }
+
             // Run one model and stream its text into the UI as a single
             // assistant message. Returns the captured text + whether the
             // model errored. We only emit the message envelope once the
@@ -958,7 +978,7 @@ export const Route = createFileRoute("/api/chat")({
             async function runModel(
               candidate: ModelCandidate,
               sys: string,
-              opts: { maxRetries?: number } = {},
+              opts: { maxRetries?: number; bufferUntilComplete?: boolean; suppressRefusal?: boolean } = {},
             ): Promise<{
               text: string;
               failed: boolean;
@@ -982,17 +1002,25 @@ export const Route = createFileRoute("/api/chat")({
                     throw part.error;
                   }
                   if (part.type !== "text-delta") continue;
-                  if (!started) {
+                  if (!started && !opts.bufferUntilComplete) {
                     writer.write({ type: "start", messageId });
                     writer.write({ type: "start-step" });
                     writer.write({ type: "text-start", id: partId });
                     started = true;
                   }
                   text += part.text;
-                  writer.write({ type: "text-delta", id: partId, delta: part.text });
+                  if (!opts.bufferUntilComplete) {
+                    writer.write({ type: "text-delta", id: partId, delta: part.text });
+                  }
                 }
                 if (!text.trim()) {
                   throw new Error("Model returned an empty response.");
+                }
+                if (opts.bufferUntilComplete) {
+                  if (opts.suppressRefusal && looksLikeRefusal(text)) {
+                    return { text, failed: false, creditsOrRateLimit: false, errorClass: null };
+                  }
+                  emitText(text);
                 }
                 if (started) {
                   writer.write({ type: "text-end", id: partId });
