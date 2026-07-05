@@ -600,7 +600,7 @@ export const Route = createFileRoute("/api/chat")({
         ].join("\n");
 
         const baseSystem = settings?.system_prompt_override?.trim() || DED_PERSONA;
-        const personalityBlock = await buildPersonalityBlock(supabase, userId);
+
         let system = [
           baseSystem,
           "",
