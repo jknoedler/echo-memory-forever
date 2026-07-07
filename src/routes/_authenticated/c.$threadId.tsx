@@ -819,7 +819,29 @@ function ChatWindow({
           {(() => {
             const out: React.ReactNode[] = [];
             let lastHour: string | null = null;
+            // Defensive dedupe: drop any message whose id we've already
+            // rendered this pass, and collapse consecutive assistant
+            // messages that carry identical text (upstream stream +
+            // realtime persist can occasionally both land in the array).
+            const seenIds = new Set<string>();
+            const deduped: typeof messages = [];
             for (const m of messages) {
+              if (seenIds.has(m.id)) continue;
+              seenIds.add(m.id);
+              const prev = deduped[deduped.length - 1];
+              if (prev && prev.role === "assistant" && m.role === "assistant") {
+                const textOf = (mm: typeof m) =>
+                  mm.parts
+                    .map((p) => (p.type === "text" ? p.text : ""))
+                    .join("")
+                    .trim();
+                const a = textOf(prev);
+                const b = textOf(m);
+                if (a && b && a === b) continue;
+              }
+              deduped.push(m);
+            }
+            for (const m of deduped) {
               const iso = timeMap.get(m.id);
               if (iso) {
                 const d = new Date(iso);
